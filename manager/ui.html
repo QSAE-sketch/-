@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>下载站管理</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.5 "Microsoft YaHei","Segoe UI",sans-serif;background:#fff;color:#17181c;display:flex;flex-direction:column;height:100vh}
+  header{padding:14px 18px;border-bottom:1px solid #e5e7eb}
+  h1{font-size:18px;margin:0 0 4px}
+  #note{font-size:13px;color:#2563eb;min-height:20px}
+  .bar{display:flex;gap:8px;padding:12px 18px;flex-wrap:wrap;border-bottom:1px solid #e5e7eb}
+  button{padding:7px 13px;border:1px solid #d1d5db;background:#f6f7f9;border-radius:8px;cursor:pointer;font:inherit;font-size:13px}
+  button.primary{background:#2563eb;color:#fff;border-color:#2563eb}
+  button:hover{opacity:.85}
+  .list{flex:1;overflow:auto;padding:8px 18px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:12px;color:#6b7280;padding:8px 6px;border-bottom:1px solid #e5e7eb}
+  td{padding:8px 6px;border-bottom:1px solid #f0f1f3;font-size:13px}
+  tr.sel{background:#eff6ff}
+  tr.off{opacity:.45}
+  .name{max-width:280px;overflow-wrap:anywhere}
+  .tp{color:#6b7280;font-size:12px}
+  .url{color:#6b7280;font-size:12px;max-width:220px;overflow-wrap:anywhere}
+  .add{display:flex;gap:8px;padding:12px 18px;border-top:1px solid #e5e7eb;flex-wrap:wrap;align-items:center}
+  input{padding:7px 9px;border:1px solid #d1d5db;border-radius:8px;font:inherit;font-size:13px}
+  #addName{width:220px}#addType{width:110px}#addSize{width:95px}#addUrl{flex:1;min-width:180px}
+  footer{padding:10px 18px;border-top:1px solid #e5e7eb;font-size:12px;color:#6b7280}
+</style>
+</head>
+<body>
+<header>
+  <h1>下载站管理</h1>
+  <div id="note">正在读取云端清单…</div>
+</header>
+<div class="bar">
+  <button onclick="reload()">刷新</button>
+  <button onclick="move(-1)">上移</button>
+  <button onclick="move(1)">下移</button>
+  <button onclick="toTop()">置顶</button>
+  <button onclick="toggle()">启用 / 禁用</button>
+  <button onclick="editRow()">编辑选中</button>
+  <button onclick="removeRow()">删除</button>
+  <button onclick="pick()">选择本地文件</button>
+  <button class="primary" onclick="save()">保存到云端</button>
+</div>
+<div class="list">
+  <table>
+    <thead><tr><th style="width:48px">启用</th><th style="width:40px">#</th><th>名字</th><th style="width:80px">类型</th><th style="width:80px">大小</th><th>下载链接（留空 = 站点内文件）</th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+</div>
+<div class="add">
+  <input id="addName" placeholder="名字，例如 笔记.txt">
+  <input id="addType" list="typeList" placeholder="类型，如 TXT">
+  <datalist id="typeList">
+    <option value="APK"><option value="TXT"><option value="PPTX"><option value="DOCX">
+    <option value="XLSX"><option value="PDF"><option value="PY"><option value="图片">
+    <option value="视频"><option value="音频"><option value="压缩包"><option value="其他">
+  </datalist>
+  <input id="addSize" placeholder="大小，如 12 KB">
+  <input id="addUrl" placeholder="下载链接（可选）">
+  <input type="hidden" id="addStored">
+  <button id="addBtn" onclick="submitRow()">添加条目</button>
+  <button onclick="cancelEdit()">取消编辑</button>
+</div>
+<footer>添加时填：名字 / 类型 / 大小（选本地文件会自动带出，可改）。非 APK 文件会托管为 .bin，保证点了就下载而不是在浏览器打开；文件本体仍需发布一次才能在远程下载，填外部链接则即时生效。</footer>
+
+<script>
+const { ipcRenderer } = require('electron');
+let rows = [];
+let sel = -1;
+let editing = -1;
+const $ = function (id) { return document.getElementById(id); };
+function note(t) { $('note').textContent = t; }
+function cache() { ipcRenderer.invoke('cache', rows); }
+function resetForm() {
+  editing = -1;
+  $('addBtn').textContent = '添加条目';
+  $('addName').value = ''; $('addType').value = ''; $('addSize').value = '';
+  $('addUrl').value = ''; $('addStored').value = '';
+}
+
+function render() {
+  const tb = $('rows');
+  tb.innerHTML = '';
+  rows.forEach(function (r, i) {
+    const tr = document.createElement('tr');
+    tr.className = (i === sel ? 'sel ' : '') + (r.enabled ? '' : 'off');
+    tr.onclick = function () { sel = i; render(); };
+    tr.innerHTML = '<td><input type="checkbox"></td><td></td><td class="name"></td><td class="tp"></td><td></td><td class="url"></td>';
+    const cb = tr.querySelector('input');
+    cb.checked = !!r.enabled;
+    cb.onclick = function (e) { e.stopPropagation(); rows[i].enabled = cb.checked; cache(); render(); };
+    tr.children[1].textContent = i + 1;
+    tr.querySelector('.name').textContent = r.name;
+    tr.querySelector('.tp').textContent = r.type || '';
+    tr.children[4].textContent = r.size || '';
+    tr.querySelector('.url').textContent = r.url || '(站点内文件)';
+    tb.appendChild(tr);
+  });
+}
+
+async function reload() {
+  note('正在读取云端清单…');
+  const r = await ipcRenderer.invoke('load');
+  rows = r.rows || []; sel = -1; resetForm(); render(); note(r.note);
+}
+function move(d) {
+  if (sel < 0) return note('先点选一行');
+  const j = sel + d;
+  if (j < 0 || j >= rows.length) return;
+  const t = rows[sel]; rows[sel] = rows[j]; rows[j] = t; sel = j;
+  cache(); render(); note('顺序已调整，点「保存到云端」生效');
+}
+function toTop() {
+  if (sel <= 0) return note('先点选一行（非第一行）');
+  const t = rows.splice(sel, 1)[0]; rows.unshift(t); sel = 0;
+  cache(); render(); note('已置顶，点「保存到云端」生效');
+}
+function toggle() {
+  if (sel < 0) return note('先点选一行');
+  rows[sel].enabled = !rows[sel].enabled;
+  cache(); render(); note('已切换启用状态，点「保存到云端」生效');
+}
+function removeRow() {
+  if (sel < 0) return note('先点选一行');
+  rows.splice(sel, 1); sel = -1; resetForm();
+  cache(); render(); note('已移除，点「保存到云端」生效');
+}
+function editRow() {
+  if (sel < 0) return note('先点选一行');
+  editing = sel;
+  $('addName').value = rows[sel].name;
+  $('addType').value = rows[sel].type || '其他';
+  $('addSize').value = rows[sel].size || '';
+  $('addUrl').value = rows[sel].url || '';
+  $('addStored').value = rows[sel].stored || '';
+  $('addBtn').textContent = '应用修改';
+  note('正在编辑第 ' + (sel + 1) + ' 项：改名字 / 类型 / 大小 / 链接，然后点「应用修改」');
+}
+function cancelEdit() { resetForm(); note('已取消编辑'); }
+function submitRow() {
+  const name = $('addName').value.trim();
+  if (!name) return note('请填名字');
+  for (let i = 0; i < rows.length; i++) {
+    if (i !== editing && rows[i].name === name) return note('已存在同名条目');
+  }
+  const common = {
+    label: name,
+    type: $('addType').value.trim() || '其他',
+    size: $('addSize').value.trim(),
+    url: $('addUrl').value.trim(),
+    stored: $('addStored').value.trim()
+  };
+  if (editing >= 0) {
+    rows[editing].name = name;
+    rows[editing].label = common.label;
+    rows[editing].type = common.type;
+    rows[editing].size = common.size;
+    rows[editing].url = common.url;
+    rows[editing].stored = common.stored;
+    note('已修改「' + name + '」，点「保存到云端」生效');
+  } else {
+    rows.push({
+      name: name, label: name, type: common.type, size: common.size,
+      url: common.url, stored: common.stored, enabled: true
+    });
+    sel = rows.length - 1;
+    note('已添加「' + name + '」，点「保存到云端」生效');
+  }
+  resetForm(); cache(); render();
+}
+async function pick() {
+  const r = await ipcRenderer.invoke('pick-file');
+  if (!r) return;
+  $('addName').value = r.name;
+  $('addType').value = r.type;
+  $('addSize').value = r.size;
+  $('addStored').value = r.stored;
+  note(r.copied
+    ? ('已选择「' + r.name + '」' + (r.stored ? '，托管为 ' + r.stored + '（点了就下载）' : '') + '；文件本体还需发布一次才能远程下载')
+    : '文件已选择，但复制到站点目录失败');
+}
+async function save() {
+  note('正在保存到云端…');
+  const r = await ipcRenderer.invoke('save', rows);
+  note(r.note);
+  if (r.ok) {
+    const fresh = await ipcRenderer.invoke('load');
+    if (fresh.ok) { rows = fresh.rows; render(); note(r.note); }
+  }
+}
+reload();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# 运行时 / 大文件（不进版本库）
+node_modules/
+site/files/
+*.apk
+*.bin
+*.exe
+*.dll
+*.pak
+*.log
+
+# 临时 / 编辑器
+.tmp*/
+*.tmp
+.DS_Store
+Thumbs.db

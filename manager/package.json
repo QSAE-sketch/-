@@ -1,0 +1,12 @@
+{
+  "name": "apk-download-manager",
+  "version": "1.0.0",
+  "description": "APK 下载站清单管理器",
+  "main": "main.js",
+  "private": true,
+  "dependencies": {
+    "@tencent-ai/workbuddy-cloud-sdk": "^0.1.4-dev.ca27990.202610161713",
+    "electron": "^45.3.2",
+    "electron-packager": "^17.1.2"
+  }
+}
