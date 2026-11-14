@@ -582,3 +582,11 @@ code-generator → code-to-website → html-to-windows-exe → desktop-to-remote
 · 线上：https://apk-download-site.app.workbuddy.host/?sharecode=QQKVVQEL2D
 · 仓库：https://github.com/QSAE-sketch/-（公开，大佬确认私有仓库 AI 侧用不了）
 · 注：自本日起，资料主库改为本 Git 仓库；U 盘仅作离线副本，不再作为主存。
+
+────────────────────────────────────────
+2026-11-14  轻聊 2.2.0 接入记忆库 Git 主库（源码备份）
+────────────────────────────────────────
+· 资料主库 = Git（D:/apk-download-site）；U 盘仅离线副本，不再作主存
+· 资料/源码/轻聊/ 更新至 v2.2.0（含搜索房间），排除 node_modules/dist/data*/二进制
+· 资料/游戏成果/轻聊/说明.txt 建索引（exe 666KB / apk 117KB，存 U 盘离线副本）
+· 本地仓库 chatapp/.git 两轮提交（934177c 基线 / 718c6cd 搜索）；GitHub qingliao 误建待删

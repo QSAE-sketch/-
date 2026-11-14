@@ -318,7 +318,7 @@ function boot(env) {
     return null;
   });
   /* 预置 token，模拟已登录用户直接打开页面 */
-  bEnv2.sandbox.document.cookie = 'll_token=[已隐去]';
+  bEnv2.sandbox.document.cookie = 'll_token=tok_basic_123';
 
   let bErr2 = null;
   try {

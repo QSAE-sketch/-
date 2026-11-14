@@ -38,6 +38,15 @@ struct Room {
              muted(false), createdAt(0) {}
 };
 
+/* 房间搜索结果（按名称搜索） */
+struct RoomSearchItem {
+    std::string id, kind, name, ownerName;
+    int memberCount;
+    bool hasPassword, joined;
+    long long createdAt;
+    RoomSearchItem() : memberCount(0), hasPassword(false), joined(false), createdAt(0) {}
+};
+
 struct MsgFile {
     std::string id, name, mime, url, dlUrl;
     long long size;
@@ -107,6 +116,8 @@ public:
     bool fetchRooms(std::vector<Room>& out, std::string& publicRoomId);
     bool createRoom(const std::string& name, const std::string& password, Room& out);
     bool joinRoom(const std::string& roomId, const std::string& password);
+    bool verifyRoom(const std::string& roomId, const std::string& password);  // 只验证密码不加入
+    bool searchRooms(const std::string& keyword, std::vector<RoomSearchItem>& out);
     bool leaveRoom(const std::string& roomId);
     bool fetchMembers(const std::string& roomId, std::vector<User>& out);
     bool fetchMemberInfos(const std::string& roomId, std::vector<Member>& out);

@@ -321,6 +321,22 @@ option { background: var(--surface); color: var(--fg); }
 .act.danger { color: var(--danger); }
 input[type=file] { display: none; }
 
+/* ---------------- 搜索房间（标准版） ---------------- */
+.srch-bar { display: flex; gap: 8px; align-items: center; padding: 10px 13px; border-bottom: 1px solid var(--border-2); }
+.srch-bar .inp { flex: 1; min-width: 0; }
+.srch-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 13px; border-bottom: 1px solid var(--border-2);
+}
+.srch-item:last-child { border-bottom: 0; }
+.srch-item .r-main { flex: 1; min-width: 0; }
+.srch-item .btn { flex: 0 0 auto; white-space: nowrap; }
+mark.kw {
+  background: rgba(212, 175, 55, .38); color: inherit;
+  border-radius: 3px; padding: 0 2px; font-weight: 600;
+}
+[data-theme="dark"] mark.kw { background: rgba(212, 175, 55, .30); }
+
 /* ---------------- 聊天 ---------------- */
 .chat-screen { background: var(--bg); }
 .msgs { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 8px; }

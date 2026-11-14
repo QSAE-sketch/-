@@ -268,7 +268,7 @@ console.log('✓ app.js 在模拟 DOM 中加载无语法/初始化错误');
 /** 直接对服务器发请求（绕开前端，验证服务端数据是否被动过） */
 function apiCall(method, path, body, tokenOverride) {
   return new Promise((resolve) => {
-    const token = [已隐去] || localStorage.getItem('ll_token') || '';
+    const token = tokenOverride || localStorage.getItem('ll_token') || '';
     const headers = { 'X-Token': token };
     let payload = null;
     if (body !== undefined && body !== null) {

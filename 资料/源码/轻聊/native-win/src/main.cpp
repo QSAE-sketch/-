@@ -28,6 +28,7 @@
 #include <cstdlib>
 #include <cstdarg>
 #include <cmath>
+#include <cwctype>
 #include <ctime>
 #include <string>
 #include <vector>
@@ -101,6 +102,8 @@ struct AsyncResult {
     std::string version;
     std::string avatarUrl;              // RK_AVATAR_GET：头像地址
     std::vector<unsigned char> bytes;   // RK_AVATAR_GET：头像字节
+    std::vector<RoomSearchItem> searchResults;  // RK_SEARCH
+    Room room;                          // RK_SEARCH_PEEK / RK_SEARCH_JOIN：要打开的房间
     AsyncResult() : kind(0), ok(false) {}
 };
 
@@ -108,7 +111,8 @@ enum ResKind {
     RK_LOGIN = 1, RK_REGISTER, RK_ME, RK_ROOMS, RK_MSGS, RK_SEND,
     RK_UPLOAD, RK_DOWNLOAD, RK_NICK, RK_JOIN, RK_CREATE, RK_VERSION, RK_MEMBERS,
     RK_MEMBERINFOS, RK_MUTE, RK_KICK, RK_APPOINT, RK_TRANSFER, RK_DISSOLVE,
-    RK_AVATAR_SET, RK_AVATAR_CLEAR, RK_AVATAR_GET
+    RK_AVATAR_SET, RK_AVATAR_CLEAR, RK_AVATAR_GET,
+    RK_SEARCH, RK_SEARCH_PEEK, RK_SEARCH_JOIN
 };
 
 static HINSTANCE g_inst = NULL;
@@ -146,6 +150,12 @@ static HBRUSH g_brBg = NULL, g_brSide = NULL, g_brCard = NULL, g_brField = NULL;
 
 static RECT g_btnLogin, g_btnSwitch, g_btnSend, g_btnFile, g_btnNew, g_btnRefresh, g_btnSettings;
 static RECT g_btnMembers;
+static RECT g_btnSearchRoom;
+/* 搜索房间窗口状态（窗口实现定义在后方） */
+static HWND g_wndSearch = NULL;
+static HWND g_srchInput = NULL;
+static std::vector<RoomSearchItem> g_srchResults;
+static std::wstring g_srchStatus;
 /* 群管理窗口状态（窗口实现定义在后方） */
 static HWND g_wndMembers = NULL;
 static std::vector<Member> g_memberList;
@@ -1226,12 +1236,20 @@ static void paintSidebar(HDC dc, const RECT& side) {
     SelectClipRgn(dc, NULL);
     DeleteObject(clip);
 
-    /* 新建房间按钮 */
-    RECT nb = {12, side.bottom - 48, side.right - 12, side.bottom - 12};
+    /* 底部两颗按钮：搜索房间 | 新建房间 */
+    int half = (side.right - 36) / 2;
+    RECT sb = {12, side.bottom - 48, 12 + half, side.bottom - 12};
+    g_btnSearchRoom = sb;
+    bool hov = inRect(sb, pt.x, pt.y);
+    roundRect(dc, sb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
+    textOut(dc, L"搜索房间", sb, C_ACCENT, g_fontUI,
+            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+
+    RECT nb = {20 + half, side.bottom - 48, side.right - 12, side.bottom - 12};
     g_btnNew = nb;
-    bool hov = inRect(nb, pt.x, pt.y);
+    hov = inRect(nb, pt.x, pt.y);
     roundRect(dc, nb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
-    textOut(dc, L"＋  新建房间", nb, C_ACCENT, g_fontUI,
+    textOut(dc, L"＋ 新建", nb, C_ACCENT, g_fontUI,
             DT_CENTER | DT_SINGLELINE | DT_VCENTER);
 }
 
@@ -1717,6 +1735,51 @@ static void handleResult(AsyncResult* r) {
         }
         break;
 
+    case RK_SEARCH:
+        if (r->ok) {
+            g_srchResults = r->searchResults;
+            if (g_srchResults.empty()) g_srchStatus = L"没有找到相关房间，换个关键词试试";
+            else {
+                wchar_t b[64];
+                swprintf(b, 64, L"找到 %d 个房间", (int)g_srchResults.size());
+                g_srchStatus = b;
+            }
+        } else {
+            g_srchResults.clear();
+            g_srchStatus = wide(r->error);
+        }
+        if (g_wndSearch) InvalidateRect(g_wndSearch, NULL, TRUE);
+        break;
+
+    case RK_SEARCH_PEEK:
+        if (r->ok) {
+            g_view = VIEW_MAIN;
+            openRoom(r->room);
+            RECT rc2;
+            GetClientRect(g_hwnd, &rc2);
+            layoutControls(rc2.right, rc2.bottom);
+            InvalidateRect(g_hwnd, NULL, TRUE);
+            setStatus(L"正在查看「" + wide(r->room.name) + L"」（未加入，只读）");
+        } else if (g_wndSearch) {
+            MessageBoxW(g_wndSearch, wide(r->error).c_str(), L"搜索房间", MB_OK | MB_ICONWARNING);
+        }
+        break;
+
+    case RK_SEARCH_JOIN:
+        if (r->ok) {
+            loadRooms();
+            g_view = VIEW_MAIN;
+            openRoom(r->room);
+            RECT rc3;
+            GetClientRect(g_hwnd, &rc3);
+            layoutControls(rc3.right, rc3.bottom);
+            InvalidateRect(g_hwnd, NULL, TRUE);
+            setStatus(L"已加入「" + wide(r->room.name) + L"」");
+        } else if (g_wndSearch) {
+            MessageBoxW(g_wndSearch, wide(r->error).c_str(), L"搜索房间", MB_OK | MB_ICONWARNING);
+        }
+        break;
+
     default:
         break;
     }
@@ -2188,6 +2251,366 @@ static void openMembers() {
     UpdateWindow(g_wndMembers);
     g_memberSel = -1;
     reloadMembers();
+}
+
+/* ================================================================== */
+/* 搜索房间窗口（按名称搜索，结果带「进去看看 / 加入该房间」）          */
+/* ================================================================== */
+
+struct SrchRow { RECT peek, join; };
+static std::vector<SrchRow> g_srchBtns;
+
+/* 密码输入小窗（进去看看 / 加入 时给带密码的房间用） */
+static HWND g_wndPrompt = NULL, g_promptEdit = NULL;
+static std::function<void(std::string)> g_promptCb;
+static std::wstring g_promptTitle;
+static RECT g_promptOk;
+
+static Room roomFromItem(const RoomSearchItem& it) {
+    Room r;
+    r.id = it.id;
+    r.kind = it.kind;
+    r.name = it.name;
+    r.memberCount = it.memberCount;
+    r.hasPassword = it.hasPassword;
+    r.joined = it.joined;
+    r.createdAt = it.createdAt;
+    return r;
+}
+
+/** 绘制带关键词高亮的文本（命中片段金底深金字） */
+static void textOutHighlight(HDC dc, const std::wstring& text, const std::wstring& kw,
+                             RECT r, COLORREF fg) {
+    std::wstring lt = text, lk = kw;
+    for (size_t i = 0; i < lt.size(); ++i) lt[i] = (wchar_t)towlower(lt[i]);
+    for (size_t i = 0; i < lk.size(); ++i) lk[i] = (wchar_t)towlower(lk[i]);
+    size_t pos = lk.empty() ? std::wstring::npos : lt.find(lk);
+    if (pos == std::wstring::npos) {
+        textOut(dc, text, r, fg, g_fontUI, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+        return;
+    }
+    HGDIOBJ oldFont = SelectObject(dc, g_fontUI);
+    int x = r.left;
+    std::wstring pre = text.substr(0, pos);
+    std::wstring mid = text.substr(pos, kw.size());
+    std::wstring suf = text.substr(pos + kw.size());
+    SIZE sz = {0, 0};
+    if (!pre.empty()) {
+        GetTextExtentPoint32W(dc, pre.c_str(), (int)pre.size(), &sz);
+        RECT r1 = {x, r.top, x + sz.cx + 2, r.bottom};
+        textOut(dc, pre, r1, fg, g_fontUI, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+        x += sz.cx;
+    }
+    GetTextExtentPoint32W(dc, mid.c_str(), (int)mid.size(), &sz);
+    RECT hl = {x - 2, r.top + 3, x + sz.cx + 4, r.bottom - 3};
+    HBRUSH hb = CreateSolidBrush(RGB(246, 224, 140));
+    FillRect(dc, &hl, hb);
+    DeleteObject(hb);
+    RECT r2 = {x, r.top, x + sz.cx + 2, r.bottom};
+    textOut(dc, mid, r2, RGB(92, 67, 16), g_fontBold, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+    x += sz.cx;
+    if (!suf.empty()) {
+        RECT r3 = {x, r.top, r.right, r.bottom};
+        textOut(dc, suf, r3, fg, g_fontUI, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+    }
+    SelectObject(dc, oldFont);
+}
+
+static void doSearchRooms(const std::wstring& kw) {
+    std::string q = utf8(kw);
+    g_srchStatus = L"搜索中…";
+    if (g_wndSearch) InvalidateRect(g_wndSearch, NULL, TRUE);
+    postJob([q]() {
+        AsyncResult* r = new AsyncResult();
+        r->kind = RK_SEARCH;
+        r->ok = g_api.searchRooms(q, r->searchResults);
+        r->error = g_api.lastError();
+        deliver(r);
+    });
+}
+
+/* 进去看看：免密直接进（不加入），密码房先验证 */
+static void doPeekRoom(const RoomSearchItem& item, const std::string& pwd) {
+    Room room = roomFromItem(item);
+    postJob([item, pwd, room]() {
+        AsyncResult* r = new AsyncResult();
+        r->kind = RK_SEARCH_PEEK;
+        r->room = room;
+        if (item.hasPassword) {
+            r->ok = g_api.verifyRoom(item.id, pwd);
+        } else {
+            r->ok = true;
+        }
+        r->error = g_api.lastError();
+        deliver(r);
+    });
+}
+
+/* 加入该房间：成功后进入房间 */
+static void doSearchJoin(const RoomSearchItem& item, const std::string& pwd) {
+    Room room = roomFromItem(item);
+    postJob([item, pwd, room]() {
+        AsyncResult* r = new AsyncResult();
+        r->kind = RK_SEARCH_JOIN;
+        r->room = room;
+        r->ok = g_api.joinRoom(item.id, pwd);
+        r->error = g_api.lastError();
+        deliver(r);
+    });
+}
+
+static void promptThen(const std::wstring& title, std::function<void(std::string)> cb);
+
+/* 结果行的两颗按钮点击 */
+static void searchRowAction(int idx, bool peek) {
+    if (idx < 0 || idx >= (int)g_srchResults.size()) return;
+    RoomSearchItem item = g_srchResults[(size_t)idx];
+    if (item.hasPassword) {
+        promptThen(L"输入房间密码 · " + wide(item.name), [item, peek](std::string pwd) {
+            if (peek) doPeekRoom(item, pwd);
+            else doSearchJoin(item, pwd);
+        });
+    } else {
+        if (peek) doPeekRoom(item, std::string());
+        else doSearchJoin(item, std::string());
+    }
+}
+
+static LRESULT CALLBACK srchInputProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+    if (m == WM_KEYDOWN && w == VK_RETURN) {
+        doSearchRooms(getEditText(g_srchInput));
+        return 0;
+    }
+    return CallWindowProcW((WNDPROC)GetWindowLongPtrW(h, GWLP_USERDATA), h, m, w, l);
+}
+
+static LRESULT CALLBACK searchProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+    switch (m) {
+    case WM_CREATE: {
+        g_srchInput = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                      WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL,
+                                      14, 42, 300, 30, h, (HMENU)201, g_inst, NULL);
+        SendMessageW(g_srchInput, WM_SETFONT, (WPARAM)g_fontUI, TRUE);
+        SendMessageW(g_srchInput, EM_SETCUEBANNER, TRUE, (LPARAM)L"输入房间名关键词…");
+        SetWindowLongPtrW(g_srchInput, GWLP_USERDATA,
+                          (LONG_PTR)SetWindowLongPtrW(g_srchInput, GWLP_WNDPROC, (LONG_PTR)srchInputProc));
+        return 0;
+    }
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint(h, &ps);
+        RECT rc;
+        GetClientRect(h, &rc);
+        fillRect(dc, rc, C_CARD);
+
+        textOut(dc, L"搜索房间", RECT{14, 10, rc.right - 14, 34}, C_TEXT, g_fontBold,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+
+        /* 搜索按钮 */
+        RECT gb = {rc.right - 88, 42, rc.right - 14, 72};
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(h, &pt);
+        roundRect(dc, gb, 6, inRect(gb, pt.x, pt.y) ? RGB(23, 95, 205) : C_ACCENT, C_ACCENT);
+        textOut(dc, L"搜索", gb, RGB(255, 255, 255), g_fontBold,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+
+        /* 状态行 */
+        textOut(dc, g_srchStatus, RECT{14, 76, rc.right - 14, 98}, C_MUTED, g_fontSmall,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+
+        /* 结果行 */
+        g_srchBtns.clear();
+        int y = 102;
+        const int ROW_H = 58;
+        std::wstring kw;
+        {
+            wchar_t kbuf[64] = {0};
+            GetWindowTextW(g_srchInput, kbuf, 63);
+            kw = kbuf;
+        }
+        for (int i = 0; i < (int)g_srchResults.size(); ++i) {
+            if (y + ROW_H > rc.bottom - 8) {
+                textOut(dc, L"（仅显示前几条，可换个更精确的关键词）",
+                        RECT{14, y, rc.right - 14, y + 22}, C_MUTED, g_fontSmall,
+                        DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+                break;
+            }
+            const RoomSearchItem& it = g_srchResults[(size_t)i];
+            RECT row = {8, y, rc.right - 8, y + ROW_H};
+            if (i % 2 == 1) fillRect(dc, row, RGB(247, 248, 250));
+
+            /* 行尾两颗按钮：进去看看 / 加入该房间 */
+            RECT jb = {rc.right - 112, y + 13, rc.right - 16, y + 45};
+            RECT pb = {jb.left - 96, y + 13, jb.left - 8, y + 45};
+            roundRect(dc, pb, 6, inRect(pb, pt.x, pt.y) ? C_HOVER : C_CARD, C_LINE);
+            textOut(dc, L"进去看看", pb, C_ACCENT, g_fontSmall,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+            roundRect(dc, jb, 6, inRect(jb, pt.x, pt.y) ? RGB(23, 95, 205) : C_ACCENT, C_ACCENT);
+            textOut(dc, L"加入该房间", jb, RGB(255, 255, 255), g_fontSmall,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+            g_srchBtns.push_back(SrchRow{pb, jb});
+
+            /* 名称（关键词高亮）+ 副信息 */
+            RECT nameR = {16, y + 6, pb.left - 12, y + 30};
+            textOutHighlight(dc, wide(it.name), kw, nameR, C_TEXT);
+
+            wchar_t cnt[24];
+            swprintf(cnt, 24, L"%d 人", it.memberCount);
+            std::wstring sub = std::wstring(cnt) + L" · " +
+                (it.hasPassword ? L"密码房" : L"免密") + L" · " +
+                (it.ownerName.empty() ? L"未知房主" : wide(it.ownerName)) +
+                (it.joined ? L" · 已加入" : L"");
+            RECT subR = {16, y + 30, pb.left - 12, y + 52};
+            textOut(dc, sub, subR, C_MUTED, g_fontSmall,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            y += ROW_H;
+        }
+        if (g_srchResults.empty() && !g_srchStatus.empty() && g_srchStatus != L"搜索中…") {
+            /* 状态行已经显示了空结果/错误提示，这里不重复画 */
+        }
+        EndPaint(h, &ps);
+        return 0;
+    }
+    case WM_LBUTTONDOWN: {
+        int x = GET_X_LPARAM(l), y = GET_Y_LPARAM(l);
+        RECT rc;
+        GetClientRect(h, &rc);
+        RECT gb = {rc.right - 88, 42, rc.right - 14, 72};
+        if (inRect(gb, x, y)) {
+            doSearchRooms(getEditText(g_srchInput));
+            return 0;
+        }
+        for (int i = 0; i < (int)g_srchBtns.size(); ++i) {
+            if (inRect(g_srchBtns[(size_t)i].peek, x, y)) { searchRowAction(i, true); return 0; }
+            if (inRect(g_srchBtns[(size_t)i].join, x, y)) { searchRowAction(i, false); return 0; }
+        }
+        return 0;
+    }
+    case WM_MOUSEMOVE:
+        InvalidateRect(h, NULL, FALSE);   // 按钮 hover 高亮
+        return 0;
+    case WM_CLOSE:
+        DestroyWindow(h);
+        g_wndSearch = NULL;
+        g_srchInput = NULL;
+        return 0;
+    }
+    return DefWindowProcW(h, m, w, l);
+}
+
+static void openSearchWindow() {
+    if (g_wndSearch) { SetForegroundWindow(g_wndSearch); return; }
+    static bool reg = false;
+    if (!reg) {
+        WNDCLASSEXW wc = {0};
+        wc.cbSize = sizeof(wc);
+        wc.lpfnWndProc = searchProc;
+        wc.hInstance = g_inst;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = g_brCard;
+        wc.lpszClassName = L"QingLiaoSearch";
+        RegisterClassExW(&wc);
+        reg = true;
+    }
+    RECT pr;
+    GetWindowRect(g_hwnd, &pr);
+    g_wndSearch = CreateWindowExW(WS_EX_DLGMODALFRAME, L"QingLiaoSearch", L"搜索房间",
+                                  WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+                                  pr.left + 130, pr.top + 70, 480, 470,
+                                  g_hwnd, NULL, g_inst, NULL);
+    ShowWindow(g_wndSearch, SW_SHOW);
+    UpdateWindow(g_wndSearch);
+}
+
+/* ---------------- 密码输入小窗 ---------------- */
+
+static LRESULT CALLBACK promptProc(HWND h, UINT m, WPARAM w, LPARAM l) {
+    switch (m) {
+    case WM_CREATE: {
+        g_promptEdit = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
+                                       WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL | ES_PASSWORD,
+                                       16, 52, 268, 30, h, (HMENU)301, g_inst, NULL);
+        SendMessageW(g_promptEdit, WM_SETFONT, (WPARAM)g_fontUI, TRUE);
+        SendMessageW(g_promptEdit, EM_SETCUEBANNER, TRUE, (LPARAM)L"房间密码");
+        return 0;
+    }
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC dc = BeginPaint(h, &ps);
+        RECT rc;
+        GetClientRect(h, &rc);
+        fillRect(dc, rc, C_CARD);
+        textOut(dc, g_promptTitle, RECT{16, 12, rc.right - 16, 42}, C_TEXT, g_fontUI,
+                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+        POINT pt;
+        GetCursorPos(&pt);
+        ScreenToClient(h, &pt);
+        g_promptOk = RECT{rc.right - 100, 52, rc.right - 16, 86};
+        roundRect(dc, g_promptOk, 6,
+                  inRect(g_promptOk, pt.x, pt.y) ? RGB(23, 95, 205) : C_ACCENT, C_ACCENT);
+        textOut(dc, L"确定", g_promptOk, RGB(255, 255, 255), g_fontBold,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        EndPaint(h, &ps);
+        return 0;
+    }
+    case WM_LBUTTONDOWN: {
+        int x = GET_X_LPARAM(l), y = GET_Y_LPARAM(l);
+        if (inRect(g_promptOk, x, y)) {
+            std::string v = utf8(getEditText(g_promptEdit));
+            std::function<void(std::string)> cb = g_promptCb;
+            g_promptCb = std::function<void(std::string)>();
+            g_wndPrompt = NULL;
+            g_promptEdit = NULL;
+            DestroyWindow(h);
+            if (cb) cb(v);
+        }
+        return 0;
+    }
+    case WM_KEYDOWN:
+        if (w == VK_RETURN) {
+            SendMessageW(h, WM_LBUTTONDOWN, 0, MAKELPARAM(g_promptOk.left + 4, g_promptOk.top + 4));
+            return 0;
+        }
+        break;
+    case WM_CLOSE:
+        g_wndPrompt = NULL;
+        g_promptEdit = NULL;
+        g_promptCb = std::function<void(std::string)>();
+        DestroyWindow(h);
+        return 0;
+    }
+    return DefWindowProcW(h, m, w, l);
+}
+
+static void promptThen(const std::wstring& title, std::function<void(std::string)> cb) {
+    if (g_wndPrompt) {
+        SetForegroundWindow(g_wndPrompt);
+        return;
+    }
+    static bool reg = false;
+    if (!reg) {
+        WNDCLASSEXW wc = {0};
+        wc.cbSize = sizeof(wc);
+        wc.lpfnWndProc = promptProc;
+        wc.hInstance = g_inst;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.hbrBackground = g_brCard;
+        wc.lpszClassName = L"QingLiaoPrompt";
+        RegisterClassExW(&wc);
+        reg = true;
+    }
+    g_promptTitle = title;
+    g_promptCb = cb;
+    RECT pr;
+    GetWindowRect(g_wndSearch ? g_wndSearch : g_hwnd, &pr);
+    g_wndPrompt = CreateWindowExW(WS_EX_DLGMODALFRAME, L"QingLiaoPrompt", L"输入密码",
+                                  WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
+                                  pr.left + 120, pr.top + 160, 320, 132,
+                                  g_wndSearch ? g_wndSearch : g_hwnd, NULL, g_inst, NULL);
+    ShowWindow(g_wndPrompt, SW_SHOW);
+    UpdateWindow(g_wndPrompt);
+    if (g_promptEdit) SetFocus(g_promptEdit);
 }
 
 /* 新建房间：用一个最小输入窗（复用设置窗口思路，单独简单实现） */
@@ -2672,6 +3095,7 @@ static void doClick(int x, int y) {
     if (inRect(g_btnSettings, x, y)) { openSettings(); return; }
     if (inRect(g_btnSend, x, y)) { sendCurrentText(); return; }
     if (inRect(g_btnFile, x, y)) { pickAndUpload(); return; }
+    if (inRect(g_btnSearchRoom, x, y)) { openSearchWindow(); return; }
     if (inRect(g_btnNew, x, y)) { openNewRoomDialog(); return; }
     if (inRect(g_btnRefresh, x, y)) { if (!g_roomId.empty()) loadMessages(false); return; }
     if (inRect(g_btnMembers, x, y)) { openMembers(); return; }
@@ -2864,6 +3288,7 @@ static LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (g_view == VIEW_MAIN) {
                 hand = inRect(g_btnSend, pt.x, pt.y) || inRect(g_btnFile, pt.x, pt.y) ||
                        inRect(g_btnNew, pt.x, pt.y) || inRect(g_btnRefresh, pt.x, pt.y) ||
+                       inRect(g_btnSearchRoom, pt.x, pt.y) ||
                        inRect(g_btnMembers, pt.x, pt.y) ||
                        inRect(g_btnSettings, pt.x, pt.y) ||
                        (pt.x < SIDEBAR_W && pt.y > 70);

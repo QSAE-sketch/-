@@ -51,7 +51,7 @@ function req(method, path, body, token, opts) {
 }
 async function register(prefix, nickname, ua) {
   const username = prefix + crypto.randomBytes(4).toString('hex');
-  const r = await req('POST', '/api/register', { username, password: '[已隐去]', nickname }, null, { ua: ua });
+  const r = await req('POST', '/api/register', { username, password: 'smoke123', nickname }, null, { ua: ua });
   const me = await req('GET', '/api/me', null, r.json.token, { ua: ua });
   return { username, token: r.json.token, id: me.json.user.id };
 }

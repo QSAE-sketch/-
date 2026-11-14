@@ -588,11 +588,11 @@ route('POST', '/api/auth/email', async (req, res, ctx) => {
     const r = await authcloud.verifyOtp({
       channel: 'email', target: email, token: String(b.token || ''),
       verificationId: String(b.verificationId || ''), isExistingUser: !!b.isExistingUser,
-      password: [已隐去], nickname: nickname
+      password: password, nickname: nickname
     });
     if (!r.ok) return fail(res, 400, r.error.message);
     if (password && password.length < 6) return fail(res, 400, '密码至少 6 位');
-    const linked = linkCloudAccount(r.profile, mode, { authType: 'email', password: [已隐去], nickname: nickname });
+    const linked = linkCloudAccount(r.profile, mode, { authType: 'email', password: password, nickname: nickname });
     if (linked.error) return fail(res, 409, linked.error);
     return authOk(res, linked.user, { permKey: b.permKey });
   }
@@ -641,13 +641,13 @@ route('POST', '/api/auth/otp/verify', async (req, res, ctx) => {
   const r = await authcloud.verifyOtp({
     channel: channel, target: target, token: String(b.token || ''),
     verificationId: String(b.verificationId || ''), isExistingUser: !!b.isExistingUser,
-    password: [已隐去], nickname: String(b.nickname || '').trim()
+    password: password, nickname: String(b.nickname || '').trim()
   });
   if (!r.ok) return fail(res, 400, r.error.message);
 
   const linked = linkCloudAccount(r.profile, mode, {
     authType: channel === 'sms' ? 'otp' : 'email',
-    password: [已隐去],
+    password: password,
     nickname: String(b.nickname || '').trim()
   });
   if (linked.error) return fail(res, 409, linked.error);
@@ -1124,6 +1124,40 @@ route('GET', '/api/rooms', async (req, res, ctx) => {
   const rooms = mine.map((r) => roomBrief(r, ctx.user.id, ctx.user));
   rooms.sort((a, b) => (a.kind === ROOM_PUBLIC ? -1 : b.kind === ROOM_PUBLIC ? 1 : b.createdAt - a.createdAt));
   ok(res, { rooms, publicRoomId: pub.id });
+});
+
+/**
+ * 按房间名搜索（标准版 / 桌面端的「搜索房间」）：
+ * 大小写不敏感子串匹配，排除私聊与已解散房间；
+ * 未加入的房间也能搜到 —— 结果卡片提供「进去看看 / 加入该房间」。
+ */
+route('GET', '/api/rooms/search', async (req, res, ctx) => {
+  const q = String(ctx.url.searchParams.get('q') || '').trim();
+  if (!q) return fail(res, 400, '请输入搜索关键词');
+  if (q.length > 40) return fail(res, 400, '关键词过长（最多 40 字）');
+  const lower = q.toLowerCase();
+  const results = [];
+  for (const r of db.listRooms()) {
+    if (r.kind === ROOM_DM) continue;       // 私聊不可搜索
+    if (r.dissolved) continue;              // 已解散仅存档，不进搜索
+    const name = String(r.name || '');
+    if (name.toLowerCase().indexOf(lower) < 0) continue;
+    const owner = r.ownerId ? db.getUser(r.ownerId) : null;
+    results.push({
+      id: r.id,
+      kind: r.kind,
+      name,
+      hasPassword: !!r.passwordHash,
+      memberCount: db.membersOf(r.id).length,
+      joined: db.isMember(r.id, ctx.user.id),
+      ownerId: r.ownerId || null,
+      ownerName: owner ? (owner.nickname || owner.username) : '',
+      createdAt: r.createdAt
+    });
+  }
+  // 人多的在前，其次新房间在前
+  results.sort((a, b) => b.memberCount - a.memberCount || b.createdAt - a.createdAt);
+  ok(res, { results, keyword: q });
 });
 
 route('POST', '/api/rooms', async (req, res, ctx) => {

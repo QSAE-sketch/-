@@ -63,7 +63,7 @@ const req = (m, p, b, t) => reqRaw(m, p, b, t, false);
   /* 2. 配额 */
   const uname = 'smoke6_' + crypto.randomBytes(4).toString('hex');
   r = await req('POST', '/api/register', {
-    username: uname, password: '[已隐去]', nickname: '配额冒烟', permKey: KEY
+    username: uname, password: 'smoke123', nickname: '配额冒烟', permKey: KEY
   });
   check('注册临时账号（含最高权限）', r.status === 200 && r.json.user.master === true);
   const token = r.json.token;

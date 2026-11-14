@@ -25,7 +25,7 @@
   }
 
   var S = {
-    token: [已隐去].getItem('ll_token') || '',
+    token: localStorage.getItem('ll_token') || '',
     user: null,
     view: 'public',
     rooms: [],
@@ -63,6 +63,9 @@
     // ?room=<id>：登录后直达该房间（分享链接 / 测试截图用）
     var roomParam = String(location.search || '').match(/[?&]room=([^&]+)/);
     S.deepRoom = roomParam ? decodeURIComponent(roomParam[1]) : '';
+    // ?rq=关键词：直达房间页并自动搜索（分享搜索结果用）
+    var rqParam = String(location.search || '').match(/[?&]rq=([^&]+)/);
+    S.deepRoomQ = rqParam ? decodeURIComponent(rqParam[1]) : '';
   } catch (e) { /* 老内核取不到 location 就按默认页 */ }
   /** 安全绑定：元素不存在时跳过（老内核 / 部分渲染场景下不炸） */
   function bind(id, fn) {
@@ -786,6 +789,14 @@
       S.deepRoom = '';
       loadRooms(function () { openRoom(rid); });
     }
+    // 深链搜索：切到房间页并自动搜
+    if (S.deepRoomQ) {
+      S.view = 'rooms';
+      switchView('rooms');
+      if ($('roomQ')) $('roomQ').value = S.deepRoomQ;
+      doSearchRooms();
+      S.deepRoomQ = '';
+    }
   }
 
   /** 顶栏用户名随昵称/头像变化刷新（改昵称、换头像后调用） */
@@ -875,6 +886,12 @@
   function renderRooms() {
     var h = '<div class="card"><div class="card-h">操作</div>' +
       '<div class="act" id="createRoom">➕ 创建自定义房间（上限 5 个）</div></div>';
+    // 搜索房间（按名称）：结果卡片结尾带「进去看看 / 加入该房间」
+    h += '<div class="card"><div class="card-h">搜索房间</div>' +
+      '<div class="srch-bar">' +
+      '<input id="roomQ" class="inp grow" type="text" placeholder="输入房间名关键词…" maxlength="40">' +
+      '<button class="btn small primary" id="roomSearchGo">搜索</button></div>' +
+      '<div id="roomSearchOut"></div></div>';
     var mine = [], others = [];
     for (var i = 0; i < S.rooms.length; i++) {
       var r = S.rooms[i];
@@ -911,6 +928,112 @@
     h += '</div>';
     $('view').innerHTML = h;
     bindView();
+    // 搜索房间交互（标准版专属，低配/基础版不带）
+    if ($('roomSearchGo')) $('roomSearchGo').onclick = doSearchRooms;
+    if ($('roomQ')) {
+      $('roomQ').onkeydown = function (e) {
+        if (e.key === 'Enter' || e.keyCode === 13) doSearchRooms();
+      };
+    }
+    renderRoomSearchResults();
+  }
+
+  /* ---------------- 搜索房间 ---------------- */
+
+  /** 按房间名搜索；结果暂存 S.roomSearch，切换视图后回来还在 */
+  function doSearchRooms() {
+    var q = ($('roomQ') && $('roomQ').value || '').trim();
+    if (!q) { toast('请输入搜索关键词'); return; }
+    api('GET', '/api/rooms/search?q=' + encodeURIComponent(q), null, function (err, data) {
+      if (err) { toast(err.message); return; }
+      S.roomSearch = { kw: q, results: data.results || [] };
+      renderRoomSearchResults();
+    });
+  }
+
+  /** 房间名里的关键词高亮（只对命中片段着色） */
+  function hlKeyword(name, kw) {
+    name = String(name || '');
+    kw = String(kw || '');
+    var i = name.toLowerCase().indexOf(kw.toLowerCase());
+    if (i < 0 || !kw) return esc(name);
+    return esc(name.slice(0, i)) + '<mark class="kw">' + esc(name.substr(i, kw.length)) +
+      '</mark>' + esc(name.slice(i + kw.length));
+  }
+
+  function renderRoomSearchResults() {
+    var box = $('roomSearchOut');
+    if (!box) return;
+    var d = S.roomSearch;
+    if (!d) { box.innerHTML = ''; return; }
+    if (!d.results.length) {
+      box.innerHTML = '<div class="empty">没有找到名称含「' + esc(d.kw) + '」的房间</div>';
+      return;
+    }
+    var h = '';
+    for (var i = 0; i < d.results.length; i++) {
+      var r = d.results[i];
+      h += '<div class="srch-item">' +
+        '<div class="r-main">' +
+        '<div class="r-title">🏠 ' + hlKeyword(r.name, d.kw) +
+        (r.hasPassword ? '<span class="badge warn">密码</span>' : '<span class="badge gray">免密</span>') +
+        (r.joined ? '<span class="badge">已加入</span>' : '') + '</div>' +
+        '<div class="r-sub">' + r.memberCount + ' 人' +
+        (r.ownerName ? ' · 房主：' + esc(r.ownerName) : '') + '</div>' +
+        '</div>' +
+        '<button class="btn small" data-peek="' + r.id + '">进去看看</button>' +
+        '<button class="btn small primary" data-sjoin="' + r.id + '">加入该房间</button>' +
+        '</div>';
+    }
+    box.innerHTML = h;
+    var peeks = box.querySelectorAll('[data-peek]');
+    for (var p = 0; p < peeks.length; p++) {
+      peeks[p].onclick = function () { peekRoom(this.getAttribute('data-peek')); };
+    }
+    var joins = box.querySelectorAll('[data-sjoin]');
+    for (var j = 0; j < joins.length; j++) {
+      joins[j].onclick = function () { searchJoinRoom(this.getAttribute('data-sjoin')); };
+    }
+  }
+
+  function searchItem(id) {
+    var d = (S.roomSearch && S.roomSearch.results) || [];
+    for (var i = 0; i < d.length; i++) if (d[i].id === id) return d[i];
+    return null;
+  }
+
+  /** 进去看看：免密房间直接看（不加入、只读）；密码房先验证密码 */
+  function peekRoom(id) {
+    var item = searchItem(id);
+    if (item && item.hasPassword) {
+      openModal('输入房间密码',
+        '<input id="jp" type="password" placeholder="房间密码">',
+        function () {
+          var p = $('jp').value;
+          api('POST', '/api/rooms/' + id + '/verify', { password: p }, function (err) {
+            if (err) { toast(err.message); return; }
+            openRoom(id, item.name);
+          });
+          return true;
+        }, '进去看看');
+    } else {
+      openRoom(id, item ? item.name : null);
+    }
+  }
+
+  /** 加入该房间：密码房先输密码，加入成功后自动进入 */
+  function searchJoinRoom(id) {
+    var item = searchItem(id);
+    if (item && item.hasPassword) {
+      openModal('输入房间密码',
+        '<input id="jp" type="password" placeholder="房间密码">',
+        function () {
+          doJoin(id, $('jp').value);
+          return true;
+        }, '加入');
+    } else {
+      doJoin(id, '');
+    }
   }
 
   /* ---------------- 视图：好友 ---------------- */

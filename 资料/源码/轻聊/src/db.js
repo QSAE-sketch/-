@@ -301,7 +301,7 @@ function createDb(store) {
       const { randomToken } = require('./util');
       const doc = {
         id: randomId('f_'),
-        accessToken: [已隐去](),    // 独立访问令牌（供 <img>/<video> 直连）
+        accessToken: randomToken(),    // 独立访问令牌（供 <img>/<video> 直连）
         ownerId,
         roomId,
         name: String(name || 'file'),

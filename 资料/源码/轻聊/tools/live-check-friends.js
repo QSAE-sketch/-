@@ -30,7 +30,7 @@ function req(method, path, body, token) {
 }
 (async () => {
   await req('GET', '/?sharecode=T7ELJZOC5A');
-  let r = await req('POST', '/api/login', { username: 'qa2411', password: '[已隐去]' });
+  let r = await req('POST', '/api/login', { username: 'qa2411', password: 'pass1234' });
   const A = r.json.token;
   r = await req('GET', '/api/friends', null, A);
   console.log('A 的好友接口：');

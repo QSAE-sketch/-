@@ -42,7 +42,7 @@ function req(method, path, body, token) {
 (async () => {
   const uniq = crypto.randomBytes(4).toString('hex');
   const username = 'smoke_' + uniq;
-  let r = await req('POST', '/api/register', { username, password: '[已隐去]', nickname: '原始昵称' });
+  let r = await req('POST', '/api/register', { username, password: 'smoke123', nickname: '原始昵称' });
   check('线上注册测试账号成功', r.status === 200 && r.json.token, r.json);
   const token = r.json.token;
 
@@ -58,7 +58,7 @@ function req(method, path, body, token) {
   check('缺少 confirm 被拒 400', r.status === 400, r.json);
   r = await req('POST', '/api/account/delete', { confirm: true }, token);
   check('线上注销返回 200', r.status === 200 && r.json.ok === true, r.json);
-  r = await req('POST', '/api/login', { username, password: '[已隐去]' });
+  r = await req('POST', '/api/login', { username, password: 'smoke123' });
   check('线上注销后无法再登录(401)', r.status === 401, r.status);
 
   console.log('\n线上冒烟 通过: ' + pass + '  失败: ' + fail);

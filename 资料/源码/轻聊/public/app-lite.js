@@ -150,7 +150,7 @@
   } catch (e) { }
 
   var S = {
-    token: [已隐去](),
+    token: readToken(),
     user: null,
     view: liteStartView,
     rooms: [],
@@ -1092,7 +1092,7 @@
   function boot() {
     try {
       var m = String(location.search || '').match(/[?&]wl_token=([^&]+)/);
-      if (m) { S.token = [已隐去](m[1]); saveToken(S.token); }
+      if (m) { S.token = decodeURIComponent(m[1]); saveToken(S.token); }
     } catch (e) { }
     try { if (localStorage.getItem('ll_lite_dark') === '1') document.body.className = 'dark'; }
     catch (e2) { }

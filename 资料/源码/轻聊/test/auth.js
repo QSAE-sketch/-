@@ -93,7 +93,7 @@ function check(name, cond, extra) {
   r = await req('POST', '/api/auth/email', { mode: 'login', email: 'not-an-email', password: 'pass123' });
   check('邮箱格式非法被拒(400/401)', r.status === 400 || r.status === 401, r.json);
 
-  r = await req('POST', '/api/auth/email', { mode: 'login', email: mail, password: '[已隐去]' });
+  r = await req('POST', '/api/auth/email', { mode: 'login', email: mail, password: 'wrong-password-xyz' });
   check('邮箱密码错误被拒(401)', r.status === 401, r.json);
 
   /* ---------------- C. 验证码（邮箱 / 短信） ---------------- */

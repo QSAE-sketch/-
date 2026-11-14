@@ -52,7 +52,7 @@ function check(name, cond, extra) {
   r = await req('POST', '/api/register', { username: C, password: 'pass123', nickname: '卡罗尔' });
   const tc = r.json.token, uc = r.json.user;
   check('第二个账号注册成功', r.status === 200 && tb, r.json);
-  r = await req('POST', '/api/login', { username: A, password: '[已隐去]' });
+  r = await req('POST', '/api/login', { username: A, password: 'wrongpass' });
   check('错误密码登录失败(401)', r.status === 401, r.json);
   r = await req('POST', '/api/login', { username: A, password: 'pass123' });
   check('正确密码登录成功', r.status === 200 && r.json.ok, r.json);
@@ -137,14 +137,14 @@ function check(name, cond, extra) {
   r = await req('POST', '/api/rooms/' + freeRoom + '/messages', { kind: 'text', content: '加入后发言' }, tb);
   check('加入后可以发言', r.status === 200, r.json);
 
-  r = await req('POST', '/api/rooms', { name: '密码房', password: '[已隐去]' }, tc);
+  r = await req('POST', '/api/rooms', { name: '密码房', password: 'secret123' }, tc);
   const pwdRoom = r.json.room.id;
   check('创建带密码房间', r.status === 200 && r.json.room.hasPassword === true, r.json);
   r = await req('GET', '/api/rooms/' + pwdRoom + '/messages?since=0', null, tb);
   check('密码房未验证密码不能进入', r.status === 403, r.json);
   r = await req('POST', '/api/rooms/' + pwdRoom + '/join', { password: 'wrong' }, tb);
   check('错误密码无法加入', r.status === 401, r.json);
-  r = await req('POST', '/api/rooms/' + pwdRoom + '/join', { password: '[已隐去]' }, tb);
+  r = await req('POST', '/api/rooms/' + pwdRoom + '/join', { password: 'secret123' }, tb);
   check('正确密码可加入', r.status === 200, r.json);
   r = await req('POST', '/api/rooms/' + pwdRoom + '/messages', { kind: 'text', content: '密码房发言' }, tb);
   check('密码房加入后可发言', r.status === 200, r.json);

@@ -1,4 +1,21 @@
+# 运行时数据（不进版本库）
 data/
+data-*/
 node_modules/
 *.log
+
+# 系统 / 编辑器
 .DS_Store
+Thumbs.db
+
+# 编译中间产物（成品 轻聊.exe / 轻聊.apk 在根目录，纳入版本库）
+*.o
+native-win/*.exe
+native-win/*.bmp
+native-win/*.png
+desktop/*.exe
+desktop/*.o
+android/.gradle/
+android/**/build/
+android/local.properties
+dist/

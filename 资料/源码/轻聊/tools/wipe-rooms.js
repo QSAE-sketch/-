@@ -49,7 +49,7 @@ function req(method, p, body, token) {
 (async () => {
   const uname = 'wipe_' + crypto.randomBytes(4).toString('hex');
   let r = await req('POST', '/api/register', {
-    username: uname, password: '[已隐去]', nickname: '清库临时账号', permKey: KEY
+    username: uname, password: 'wipe123456', nickname: '清库临时账号', permKey: KEY
   });
   if (r.status !== 200 || !r.json.user || r.json.user.master !== true) {
     console.error('✗ 无法取得最高权限：' + JSON.stringify(r.json));

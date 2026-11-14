@@ -33,7 +33,7 @@ function req(method, path, body, token) {
 (async () => {
   await req('GET', '/?sharecode=T7ELJZOC5A');
   // 登录 A（浏览器里刚注册的账号）
-  let r = await req('POST', '/api/login', { username: 'qa2411', password: '[已隐去]' });
+  let r = await req('POST', '/api/login', { username: 'qa2411', password: 'pass1234' });
   if (!r.json || !r.json.token) { console.error('A 登录失败', r.status, JSON.stringify(r.json)); process.exit(1); }
   const A = r.json.token;
   const meA = await req('GET', '/api/me', null, A);

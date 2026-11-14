@@ -147,7 +147,7 @@ async function verifyOtp(opts) {
   const params = { verificationId, token, isExistingUser: !!isExistingUser };
   if (channel === 'sms') params.phone = value;
   else params.email = value;
-  if (password) params.password = [已隐去];
+  if (password) params.password = password;
 
   const { data, error } = unwrap(await getClient().auth.verifyOtp(params));
   if (error) return { ok: false, error };

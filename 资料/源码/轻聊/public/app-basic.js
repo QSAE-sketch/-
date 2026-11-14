@@ -249,7 +249,7 @@
   }
 
   var S = {
-    token: [已隐去](),
+    token: readToken(),
     user: null,
     view: startView(),
     rooms: [],

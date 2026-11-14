@@ -55,7 +55,7 @@ function tinyPng() {
 }
 
 const uniq = 'av' + Date.now().toString(36);
-const user = { username: uniq, password: '[已隐去]', nickname: '头像测试' };
+const user = { username: uniq, password: 'pass1234', nickname: '头像测试' };
 
 (async () => {
   console.log('\n──── 自定义头像 ────');

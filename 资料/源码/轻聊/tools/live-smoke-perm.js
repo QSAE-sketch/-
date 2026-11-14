@@ -45,7 +45,7 @@ function req(method, path, body, token) {
 
   /* 1. 普通账号：登录时输入正确密钥 → 拿到 30 分钟最高权限 */
   const mu = 'smoke_m_' + uniq;
-  let r = await req('POST', '/api/register', { username: mu, password: '[已隐去]', nickname: '权限冒烟', permKey: KEY });
+  let r = await req('POST', '/api/register', { username: mu, password: 'smoke123', nickname: '权限冒烟', permKey: KEY });
   check('线上注册并提交权限密钥', r.status === 200 && r.json.token, r.json);
   const mTok = r.json && r.json.token;
   check('密钥正确 → perm.granted', !!(r.json && r.json.perm && r.json.perm.granted === true), r.json && r.json.perm);
@@ -55,7 +55,7 @@ function req(method, path, body, token) {
 
   /* 2. 普通账号（无密钥）：公共大厅不可解散 */
   const nu = 'smoke_n_' + uniq;
-  r = await req('POST', '/api/register', { username: nu, password: '[已隐去]', nickname: '普通冒烟' });
+  r = await req('POST', '/api/register', { username: nu, password: 'smoke123', nickname: '普通冒烟' });
   const nTok = r.json && r.json.token;
   check('普通账号注册成功', !!nTok, r.json);
 
@@ -84,7 +84,7 @@ function req(method, path, body, token) {
 
   /* 6. 最高权限：注销指定用户 */
   const du = 'smoke_d_' + uniq;
-  r = await req('POST', '/api/register', { username: du, password: '[已隐去]', nickname: '待注销冒烟' });
+  r = await req('POST', '/api/register', { username: du, password: 'smoke123', nickname: '待注销冒烟' });
   const dTok = r.json && r.json.token;
   const dId = r.json && r.json.user && r.json.user.id;
   check('待注销账号注册成功', !!(dTok && dId), r.json);
@@ -92,7 +92,7 @@ function req(method, path, body, token) {
   check('普通账号调用注销接口被拒 403', r.status === 403, r.json);
   r = await req('POST', '/api/admin/users/' + dId + '/delete', { confirm: true }, mTok);
   check('最高权限可注销指定用户', r.status === 200 && r.json.deleted === true, r.json);
-  r = await req('POST', '/api/login', { username: du, password: '[已隐去]' });
+  r = await req('POST', '/api/login', { username: du, password: 'smoke123' });
   check('被注销账号无法登录', r.status === 401, r.json);
 
   /* 7. 清理：注销两个冒烟账号 */

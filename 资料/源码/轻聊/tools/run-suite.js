@@ -37,6 +37,7 @@ const TESTS = [
   'test/drive.js',
   'test/limits.js',
   'test/avatar.js',
+  'test/room-search.js',
   'test/lite-boot.js',
   'test/ui.js'
 ];

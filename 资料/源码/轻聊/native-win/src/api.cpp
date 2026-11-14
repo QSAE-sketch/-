@@ -5,6 +5,7 @@
 #include <shlobj.h>
 #include <cstdio>
 #include <cstdlib>
+#include <cctype>
 #include <vector>
 #include <string>
 
@@ -350,6 +351,48 @@ bool Api::joinRoom(const std::string& roomId, const std::string& password) {
     HttpResponse r = http_.post("/api/rooms/" + roomId + "/join", req.dump(), "");
     Json j;
     return parseOk(r, j);
+}
+
+bool Api::verifyRoom(const std::string& roomId, const std::string& password) {
+    Json req = Json::object();
+    req.set("password", password);
+    HttpResponse r = http_.post("/api/rooms/" + roomId + "/verify", req.dump(), "");
+    Json j;
+    return parseOk(r, j);
+}
+
+bool Api::searchRooms(const std::string& keyword, std::vector<RoomSearchItem>& out) {
+    std::string q;
+    for (size_t i = 0; i < keyword.size(); ++i) {
+        unsigned char c = (unsigned char)keyword[i];
+        if (c == ' ') q += "%20";
+        else if (c < 0x80 && !isalnum(c) && c != '-' && c != '_' && c != '.') {
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%%%02X", c);
+            q += buf;
+        } else q += (char)c;
+    }
+    HttpResponse r = http_.get("/api/rooms/search?q=" + q);
+    Json j;
+    if (!parseOk(r, j)) return false;
+    out.clear();
+    const Json* arr = j.find("results");
+    if (arr && arr->isArray()) {
+        for (size_t i = 0; i < arr->items.size(); ++i) {
+            const Json& it = arr->items[i];
+            RoomSearchItem item;
+            item.id = it.str("id");
+            item.kind = it.str("kind");
+            item.name = it.str("name");
+            item.ownerName = it.str("ownerName");
+            item.memberCount = (int)it.i64("memberCount");
+            item.hasPassword = it.boolOf("hasPassword");
+            item.joined = it.boolOf("joined");
+            item.createdAt = it.i64("createdAt");
+            out.push_back(item);
+        }
+    }
+    return true;
 }
 
 bool Api::leaveRoom(const std::string& roomId) {
