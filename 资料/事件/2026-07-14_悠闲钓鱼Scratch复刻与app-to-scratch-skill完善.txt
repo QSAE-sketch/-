@@ -1,0 +1,31 @@
+2026-07-14 任务总结：悠闲钓鱼 Scratch 复刻 + app-to-scratch Skill 完善
+
+一、任务背景
+- 大佬希望把 Windows 桌面应用《悠闲钓鱼》（Electron 游戏）转换成 Scratch 能直接打开、并且能玩的 .sb3 项目。
+- 同时要求把转换过程精细化做成一个可复用的 Skill（app-to-scratch）。
+
+二、主要过程
+1. 研究用户提供的《Scratch作品.sb3》全积木示例沙盘，理解 Scratch 3.0 project.json 结构、积木引用模型、输入格式等。
+2. 创建 app-to-scratch Skill（detect/parse/build/verify/convert 链路）。
+3. 用 Skill 转换《悠闲钓鱼》时发现：canvas 游戏循环无法从 DOM 解析，Skill 降级得到空骨架，于是手搓一个基于 Scratch 状态机的可玩版本。
+4. 用 bug-fixer 自检，修复 4 处逻辑 bug（重复结算、最佳分、天气残块、浮点索引）。
+5. 桌面版 .sb3 多次在 Scratch 中打不开，逐次修复：
+   - 第一次：Stage 字段缺失 + 裸 block id 未包装 → 补齐字段、加 `_in()` 包装。
+   - 第二次：event_broadcast 带 inputs + 数字字面量格式错误 → 去掉 inputs、改 S_broadcast。
+   - 第三次：151 个嵌套块 parent=null → 加 `fix_parents()` 全局回填。
+   - 第四次：Stage 多了 sprite 专属字段 + 数字字面量改成字符串 + monitor 格式对齐 + block id 全 ASCII → 按用户参考文件 Scratch作品1.sb3 逐字段重写，最终成功打开。
+6. 打开后调整 UI：把底部黄色提示条「原版还有这些系统，本 Scratch 版未复刻」从 y=-175 上移到 y=-120，避免挡住按钮；把舞台背景 SVG 用 `<g transform="translate(24,18) scale(0.9)">` 整体缩到 90% 居中。
+7. 同步把新发现格式规则焊进 app-to-scratch Skill：
+   - build_sb3.py：Stage 去掉 sprite 字段、加 textToSpeechLanguage、costume 加 bitmapResolution、meta 用桌面版、加 fix_parents。
+   - verify_sb3.py：新增 Stage 字段检查、数字字面量字符串检查、costume 字段检查。
+   - SKILL.md：更新硬性要求章节。
+
+三、最终成果
+- 桌面版：`C:/Users/baoka/Desktop/悠闲钓鱼(Scratch可玩版).sb3`（已可打开，15 个 target，14 个 sprite，验证 0 错误）。
+- U 盘备份：`G:/验证/workbuddy-kb/资料/游戏成果/悠闲钓鱼/悠闲钓鱼(Scratch可玩版).sb3`。
+- 源文件：`D:/AI/2026-07-13-22-50-19/make_fishing_sb3.py`。
+- Skill 路径：`C:/Users/baoka/.workbuddy/skills/app-to-scratch/`。
+
+四、遗留/待验证
+- 黄条上移和背景缩放后的最终效果，需用户确认是否满意。
+- 后续如有新的桌面应用转换，可用升级后的 Skill 再验证稳定性。

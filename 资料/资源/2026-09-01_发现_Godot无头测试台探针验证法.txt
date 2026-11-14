@@ -1,0 +1,53 @@
+# 发现：Godot 无头测试台 + 探针法验证游戏逻辑（含挖掘距离 gate 模式）
+
+- 日期：2026-09-01
+- 参考：`D:\2D我的世界\game\tests\Harness.tscn` / `Harness.gd`
+
+## 无头自测骨架
+
+用 Godot console 版（无界面）跑一个专用测试场景，在 `_process` 里按帧号触发各探针：
+
+```
+"D:\游戏引擎\Godot_v4.7.1-stable_win64_console.exe" --headless --path . res://tests/Harness.tscn --quit-after 280
+```
+
+注意：
+- 必须 `--quit-after N`，或在探针跑完调 `get_tree().quit(0)`，否则不会自己停。
+- 输出走 `> /tmp/harness.log 2>&1; cat`，**不要** `| head` 管道（Godot 管道会挂死约 4 分钟）。
+- 过滤 `SCRIPT ERROR|Parse Error` 找错误；无头下 `move_to_trash` 报 `SHFileOperation 124` 非致命，用递归删除兜底。
+
+## 挖掘 / 交互距离 gate 模式（Minecraft-like 必备）
+
+把所有挖 / 放 / 交互收口到单一入口（如 `_handle_interaction`），内部统一做距离判定：
+
+```gdscript
+func target_in_reach(t: Vector2i) -> bool:
+    var center := Vector2(t.x * TILE + TILE * 0.5, t.y * TILE + TILE * 0.5)
+    var eye := global_position + Vector2(0, -20)
+    return eye.distance_to(center) <= reach() * TILE
+
+# _handle_interaction 开头：
+if not target_in_reach(t):
+    _reset_mining()
+    return
+```
+
+`reach()` 按模式返回不同臂长（以 TILE 为单位，如生存 4.0 / 创造 8.0）。
+这样"从地图这边挖到那一边"被彻底拦死，且放置 / 开容器也一并受限。
+
+## 探针写法（直接测 gate，不依赖模拟鼠标）
+
+```gdscript
+var near := Vector2i(px + 3, py - 1)    # 3 格内
+var far  := Vector2i(px + 40, py)       # 40 格外
+print(p.target_in_reach(near))           # true
+print(p.target_in_reach(far))            # false
+```
+
+比模拟 `Input` 事件更稳，能确定性证明 gate 生效。
+
+## 适用
+
+任何 Godot 游戏的逻辑回归自测；尤其适合无 GUI 环境下验证"玩家能不能做某事"。
+
+（盘符当前 E:，靠 UUID 0a89e2a3-ade1-4f58-ac7d-1edba7e8f167 识别）

@@ -1,0 +1,20 @@
+# 事件：开发「图片生成器」Skill（2026-07-14）
+
+## 背景
+大佬做游戏开发，需要高质量 AI 出图。明确要求：出的图绝不能是"3岁小孩涂鸦感"；无描述时默认国风彩墨画（彩色）；黑白不吉利（仅游戏背景例外）。
+
+## 过程
+1. 读 skill-creator 规范 + 现有 code-generator 格式，确认 Skill 结构（SKILL.md + references/）。
+2. 查 ImageGen 工具真实参数（prompt / size / n / quality / style / revise / background / output_dir / image / input_fidelity）。
+3. 设计核心：提示词工程 7 段式公式 + 彩色强制规则 + 默认彩墨模板，从根本上杜绝涂鸦感。
+4. 写 SKILL.md 与 references/style-prompts.md（提示词词库：质量标记 / 配色预设 / 模板 / 兜底策略）。
+5. 用默认彩墨 prompt 实测出图（无描述路径），验证质量：彩色饱满、构图有层次、笔法成片感强，非涂鸦。
+
+## 成果
+- 用户级 Skill `图片生成器` 已建：`C:\Users\baoka\.workbuddy\skills\图片生成器\`
+- 验证样图（彩墨山水）已出，质量达标，确认无 BUG
+- 已同步进机器2本地备份（skills/图片生成器）
+- 记忆库归档：资源（提示词工程方法论）+ 事件（本总结）+ 游戏成果（skill 成品）
+
+## 后续可扩展
+- 批量出图、透明背景游戏贴图、image-to-image 改色（Skill 已预留支持，待实测）

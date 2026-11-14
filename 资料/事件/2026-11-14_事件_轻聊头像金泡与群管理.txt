@@ -1,0 +1,43 @@
+2026-11-14  轻聊 2.1.0：头像切换 / 刘子墨金泡 / 消息自上而下 / 群管理 / 设置项
+────────────────────────────────────────────────────────
+
+一、自由更换头像（标准版网页 + 桌面端）
+· 服务端：POST /api/me/avatar 接 dataURL（校验 PNG/JPEG/GIF/WebP 魔数，512KB 上限），
+  落盘 DATA_DIR/avatars/<userId>.<ext>，DELETE 恢复默认；GET /api/avatars/:id 公开出图，
+  URL 带 ?v= 时间戳做缓存戳，换头像即失效。
+· publicUser / decorateMessage(senderAvatar) / 成员 / 好友序列化全部带上 avatar 字段。
+· 网页端：「我的」页头像卡 → 选图 → canvas 居中裁方压成 256px JPEG → 上传；
+  消息 / 成员 / 好友 / 资料页全量展示自定义头像，无头像回落色块首字。
+· 桌面端：GDI+ 解码头像（image.cpp 新模块：decodeImage/drawImageCircle/scaleToAvatarJpeg/
+  fillGoldRoundRect/drawGoldRing/base64Encode），内存缓存 + 后台下载，设置里可更换/恢复。
+
+二、刘子墨（founder）消息整体金色烫金流动质感
+· 覆盖：昵称金框（原有）+ 头像金环 + 头像本体金渐变 + 消息气泡金箔渐变 + 斜向流光扫过。
+· 网页：CSS linear-gradient 260% 动画 goldFlow（8s 循环）+ ::after 高光带；深色主题换深金棕配色。
+· 桌面：GDI+ fillGoldRoundRect（四段金渐变 + phase 驱动流光带）+ 80ms 定时器仅在
+  有 founder 消息时重绘，无金泡自动停表。
+
+三、消息列表改自上而下（微信/QQ 式）
+· 桌面端原「底部向上堆叠」（baseY 贴底）改为从视口顶部往下排，g_scrollY 按顶部偏移滚动，
+  新消息到达时若正看最新则自动贴底。网页端本就是时间顺序追加，无需改。
+
+四、设置项
+· 清除缓存：网页（清 localStorage/Cache API）已有；桌面新增（清头像缓存 + %TEMP% 残留截图）。
+· 下载保存位置：网页沿用浏览器默认（原有说明弹窗）；桌面新增 SHBrowseForFolderW 选目录，
+  默认 Windows 下载文件夹（%USERPROFILE%\Downloads，缺失退回文档），prefs.txt 持久化；
+  文件保存直接落所选目录，重名自动加 " (2)" 编号，不再弹另存为。
+
+五、桌面端同步群管理入口
+· 聊天顶栏新增「群管理」按钮 → 成员列表窗口（选中 + 禁言10分钟/踢出/任命管理员/转让群主/解散本群），
+  API 对齐网页版 /api/rooms/:id/mute|kick|appoint|transfer|dissolve。
+
+六、其它
+· 网页新增 ?room=<id> 深链，登录后直达房间（分享/测试用）。
+· 图标保持用户已选定的 favicon/logo 不变。
+· test/theme.js 两处 Android WebView 断言改为原生断言（2.0.0 起安卓已是原生客户端）；
+  新增 test/avatar.js 18 项（上传/取图/缓存戳/非法输入/恢复默认/消息序列化）。
+· 回归：770 通过 / 0 失败；native-win selftest 18/18；无头 Chrome 与 --shot 截图逐屏核对
+  （金泡质感、右侧头像不重叠、侧栏金环、群管理按钮、自上而下排列）。
+
+产物：资料/游戏成果/轻聊/（轻聊.exe 更新至 2.1.0；轻聊.apk 未变未动）
+源码：资料/源码/轻聊/（native-win/ + public/ + server.js + test/ + tools/ 重同步）

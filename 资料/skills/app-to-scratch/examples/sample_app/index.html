@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>点击计数器</title>
+<style>
+  body { font-family: sans-serif; padding: 20px; }
+  #panel { display: none; border: 1px solid #ccc; padding: 8px; margin-top: 8px; }
+  button { margin: 4px; padding: 6px 12px; }
+</style>
+</head>
+<body>
+  <h1>点击计数器 Demo</h1>
+  <div id="count_display">计数: 0</div>
+  <button id="btn_add">加一</button>
+  <button id="btn_reset">重置</button>
+  <button id="btn_toggle">显示/隐藏面板</button>
+  <div id="panel">这是一个隐藏面板</div>
+
+  <script>
+    var count = 0;
+    var display = document.getElementById('count_display');
+
+    btn_add.onclick = function () {
+      count = count + 1;
+      display.textContent = "已点击";
+      if (count > 3) { alert("点太多次啦"); }
+    };
+
+    btn_reset.onclick = function () {
+      count = 0;
+      display.textContent = "已重置";
+    };
+
+    btn_toggle.addEventListener('click', function () {
+      var p = document.getElementById('panel');
+      if (p.style.display === 'none') { p.style.display = 'block'; }
+      else { p.style.display = 'none'; }
+    });
+
+    // 以下能力无法在 Scratch 中还原
+    fetch('https://api.example.com/count');
+  </script>
+</body>
+</html>

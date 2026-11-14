@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">轻聊</string>
+    <!-- 线上站点地址：带 sharecode 的分享链接，首次访问会下发网关会话 Cookie -->
+    <string name="app_url" translatable="false">https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A</string>
+</resources>

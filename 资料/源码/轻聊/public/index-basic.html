@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-ll-cap="basic">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="format-detection" content="telephone=no">
+<title>轻聊 · 基础版</title>
+<link rel="stylesheet" href="/style-basic.css">
+<script>
+/* ============================================================
+ * 守门脚本（Guarded Bootstrap）
+ * 一定要用最古老的写法，且内联在最前面 —— 它必须比任何外部
+ * JS 都先跑起来，哪怕 app-basic.js 整个下载失败也能工作。
+ *
+ * 职责：
+ *   ① 记录所有运行时错误（供自检面板与「一键反馈」用）
+ *   ② 暴露初始化完成标记，未完成即视为「按钮会点不动」的信号
+ *   ③ 纯探测环境能力，不做任何修复（修复在 app-basic.js 里）
+ * ============================================================ */
+window.__LL = {
+  err: [],        /* [{m: 消息, l: 行号, t: 时间}] */
+  ready: 0,       /* 1 = 主逻辑已初始化完成 */
+  cap: 'basic',   /* 当前分发档位，由服务器注入时会改写 */
+  t0: (new Date()).getTime()
+};
+(function () {
+  var rec = function (m, l, u) {
+    try {
+      if (window.__LL.err.length > 30) return;   /* 防止死循环刷爆内存 */
+      window.__LL.err.push({ m: String(m), l: String(l), u: String(u || '') });
+    } catch (e) { }
+  };
+  /* 用 onerror 而不是 addEventListener：老内核两者都支持，但 onerror 更早生效 */
+  window.onerror = function (msg, src, line, col, err) {
+    rec(msg, line, src);
+    return false;   /* 不吞异常，让系统日志也留一份 */
+  };
+  /* 捕获 Promise 之外的「静默失败」：资源加载失败 */
+  window.onunload = null;
+})();
+</script>
+</head>
+<body>
+
+<!-- ==================== 登录 / 注册 ==================== -->
+<div id="scrAuth">
+  <div class="hd">
+    轻聊 <span class="dim">基础版</span>
+    <span class="hdR"><a href="/?lite=1" id="lnkLite">低配版</a></span>
+  </div>
+  <div class="bd">
+    <table class="tabs2" cellpadding="0" cellspacing="0">
+      <tr>
+        <td id="tabLogin" class="on" onclick="LL.setMode('login')">登录</td>
+        <td id="tabReg" onclick="LL.setMode('reg')">注册</td>
+      </tr>
+    </table>
+    <div class="card">
+      <div class="cb">
+        <label class="fl">账号</label>
+        <input id="inUser" class="ti" type="text" autocomplete="off" placeholder="2-20 位中英文/数字">
+        <label class="fl">密码</label>
+        <input id="inPass" class="ti" type="password" autocomplete="off" placeholder="至少 6 位">
+        <div id="rowNick" class="hide">
+          <label class="fl">昵称（选填，之后可改）</label>
+          <input id="inNick" class="ti" type="text" autocomplete="off" placeholder="留空则用账号名">
+        </div>
+        <label class="fl">权限密钥（选填）</label>
+        <input id="inKey" class="ti" type="text" autocomplete="off" placeholder="输入后获 30 分钟最高权限">
+        <div id="authErr" class="err"></div>
+        <button id="btnAuth" class="bt bp full" onclick="LL.doAuth()">登 录</button>
+      </div>
+    </div>
+    <div class="tipbar">基础版与标准版共用同一套账号、房间、消息与文件，数据完全互通。</div>
+    <div id="authDiagBox"></div>
+  </div>
+</div>
+
+<!-- ==================== 主界面 ==================== -->
+<div id="scrMain" class="hide">
+  <div class="hd">
+    <span id="hdTitle">公共聊天室</span>
+    <span class="hdR"><span id="hdUser" class="dim"></span></span>
+  </div>
+  <table class="nav" cellpadding="0" cellspacing="0">
+    <tr>
+      <td id="nvPublic" class="nv on" onclick="LL.go('public')">公共</td>
+      <td id="nvRooms" class="nv" onclick="LL.go('rooms')">房间</td>
+      <td id="nvFriends" class="nv" onclick="LL.go('friends')">好友</td>
+      <td id="nvDrive" class="nv" onclick="LL.go('drive')">网盘</td>
+      <td id="nvMe" class="nv" onclick="LL.go('me')">我的</td>
+    </tr>
+  </table>
+  <div id="view" class="bd"></div>
+</div>
+
+<!-- ==================== 聊天页 ==================== -->
+<div id="scrChat" class="hide">
+  <div class="hd">
+    <span id="chTitle">房间</span>
+    <span class="hdR">
+      <button class="bt sm bg" onclick="LL.back()">返回</button>
+      <button class="bt sm bg" onclick="LL.toBottom()">最新</button>
+      <button id="chMemBtn" class="bt sm bg" onclick="LL.members()">成员</button>
+    </span>
+  </div>
+  <div id="chTip"></div>
+  <div id="chMsgs" class="bd"></div>
+  <div class="sendbox">
+    <input id="inMsg" class="ti" type="text" placeholder="说点什么…">
+    <table class="srow" cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="width:46%"><input id="inFile" class="fi" type="file"></td>
+        <td style="width:18%;text-align:center"><button class="bt sm bg" onclick="LL.back()">返回</button></td>
+        <td style="width:36%;text-align:right"><button class="bt bp" style="width:96%" onclick="LL.send()">发送</button></td>
+      </tr>
+    </table>
+    <div id="upHint" class="dim"></div>
+  </div>
+</div>
+
+<!-- ==================== 自检面板 ==================== -->
+<div id="diag" class="hide"></div>
+
+<div class="capfoot">
+  <a href="/?lite=0">标准版</a> ·
+  <a href="/?lite=1">低配版</a> ·
+  <a href="javascript:LL.showDiag()">设备自检</a>
+  <div style="margin-top:5px">基础版 · 与上面两版数据互通</div>
+</div>
+
+<script src="/app-basic.js"></script>
+<script>
+/* 最后一道保险：2.5 秒后若主逻辑仍未初始化完成，说明这个内核连基础版都跑不动，
+   直接把「一键反馈」按钮推到最显眼的位置，而不是让用户面对一个点不动的页面。 */
+(function () {
+  setTimeout(function () {
+    if (window.__LL && window.__LL.ready) return;
+    var box = document.getElementById('authDiagBox');
+    if (!box) return;
+    box.innerHTML = '<div class="tipbar">⚠ 页面脚本未能完成初始化，请点下方「设备自检」把结果截图反馈。</div>' +
+      '<button class="bt bw full" onclick="LL.showDiag()">设备自检 / 反馈</button>';
+  }, 2500);
+})();
+</script>
+</body>
+</html>

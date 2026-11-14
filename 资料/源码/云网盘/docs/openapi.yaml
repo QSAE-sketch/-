@@ -1,0 +1,1007 @@
+openapi: 3.0.3
+info:
+  title: 轻聊云网盘 API
+  version: 1.0.0
+  description: |
+    云网盘核心服务层，供聊天网站（标准版 / 低配版）、Android 原生 APP、Python SDK / CLI 共同调用。
+    四端共用本契约；文件字节只在本服务，聊天消息仅存 fileId 引用。
+
+    ## 统一响应
+    所有接口（除文件二进制下载外）返回 `{ code, message, data }`：
+    - `code = 0` 表示成功，非 0 见错误码表。
+    - 文件二进制下载成功时直接返回字节流（200 / 206）。
+
+    ## 认证
+    除 `/auth/*` 与分享下载外，均需在请求头携带 `Authorization: Bearer <accessToken>`。
+    Access Token 2 小时，Refresh Token 7 天；过期由 SDK 自动刷新，无需用户干预。
+    聊天网站通过 `POST /auth/exchange` 用既有会话换取网盘 Token，从而共用账号体系。
+
+    ## 错误码
+    | code | 含义 | HTTP |
+    |---|---|---|
+    | 0 | 成功 | 200 |
+    | 40001 | 认证失败 / Token 过期 | 401 |
+    | 40002 | 文件过大 | 413 |
+    | 40003 | 文件类型不允许 | 415 |
+    | 40004 | 存储空间不足 | 409 |
+    | 40005 | 分享已过期 / 提取码错误 | 410 |
+    | 40006 | 文件不存在 | 404 |
+    | 40007 | 触发限流（60 次/分） | 429 |
+    | 50000 | 服务器内部错误 | 500 |
+
+  contact:
+    name: 轻聊项目
+  license:
+    name: Private
+
+servers:
+  - url: https://{netdiskHost}
+    description: 云网盘独立发布链接（新链接，与聊天网站域名不同）
+    variables:
+      netdiskHost:
+        default: qingliao-netdisk.app.workbuddy.host
+        description: 发布后由平台分配的实际域名
+
+tags:
+  - name: 认证
+  - name: 上传
+  - name: 下载
+  - name: 文件管理
+  - name: 分享
+  - name: 存储与监控
+
+security:
+  - bearerAuth: []
+
+paths:
+  # ==================== 认证 ====================
+  /auth/register:
+    post:
+      tags: [认证]
+      summary: 注册（网盘独立账号；推荐聊天网站用户改用 /auth/exchange）
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                  example: alice
+                password:
+                  type: string
+                  format: password
+                  example: pass123456
+                nickname:
+                  type: string
+                  example: 小明
+            examples:
+              默认:
+                value:
+                  username: alice
+                  password: [已隐去]
+                  nickname: 小明
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/TokenPair'
+              example:
+                code: 0
+                message: ok
+                data:
+                  accessToken: [已隐去]...
+                  refreshToken: [已隐去]...
+                  expiresIn: 7200
+                  userId: u_8f3a1c
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [认证]
+      summary: 账号密码登录
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, example: alice }
+                password: { type: string, format: password, example: pass123456 }
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TokenPair' }
+              example:
+                code: 0
+                message: ok
+                data:
+                  accessToken: [已隐去]...
+                  refreshToken: [已隐去]...
+                  expiresIn: 7200
+                  userId: u_8f3a1c
+        '401':
+          $ref: '#/components/responses/AuthFailed'
+
+  /auth/exchange:
+    post:
+      tags: [认证]
+      summary: 聊天网站会话换取网盘 Token（账号体系打通的关键接口）
+      description: |
+        网盘服务拿到聊天网站的 session token 后，**服务端到服务端**调用聊天网站
+        `GET /api/me`（带 `X-Service-Key` 共享密钥）校验身份；校验通过后签发网盘 JWT。
+        网盘不直接访问聊天网站数据库，聊天网站服务端无需任何改动。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [chatToken]
+              properties:
+                chatToken:
+                  type: string
+                  description: 聊天网站 localStorage 中的 `ll_token`
+                  example: 7f9c...e21a
+            examples:
+              默认:
+                value:
+                  chatToken: [已隐去]
+      responses:
+        '200':
+          description: 换取成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TokenPair' }
+        '401':
+          $ref: '#/components/responses/AuthFailed'
+
+  /auth/refresh:
+    post:
+      tags: [认证]
+      summary: 刷新 Access Token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string, example: eyJhbGciOiJIUzI1NiJ9... }
+      responses:
+        '200':
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/TokenPair' }
+        '401':
+          $ref: '#/components/responses/AuthFailed'
+
+  /auth/logout:
+    post:
+      tags: [认证]
+      summary: 登出（吊销 Refresh Token）
+      responses:
+        '200':
+          description: 已登出
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponse' }
+
+  # ==================== 上传 ====================
+  /files/upload:
+    post:
+      tags: [上传]
+      summary: 普通上传（单文件直传，< 100MB）
+      description: |
+        请求体为文件原始字节（非 multipart），用 `X-File-Name` / `Content-Type` 传元信息，
+        这样老浏览器 XHR 与 Android OkHttp 都能直接发，不需要 FormData 兼容层。
+      parameters:
+        - in: header
+          name: X-File-Name
+          required: true
+          schema: { type: string }
+          description: 文件名（需 URL 编码或 Base64，避免非 ASCII 头）
+          example: report.pdf
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: 上传成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/File' }
+              example:
+                code: 0
+                message: ok
+                data:
+                  fileId: f_2c91ab
+                  fileName: report.pdf
+                  fileSize: 2048576
+                  fileType: application/pdf
+                  storagePath: blobs/u_8f3a1c/f_2c91ab.bin
+                  thumbnailUrl: /files/f_2c91ab/thumbnail
+                  md5: d41d8cd98f00b204e9800998ecf8427e
+                  uploadTime: 1763030400000
+                  isDeleted: false
+                  shareId: null
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+        '415':
+          $ref: '#/components/responses/TypeNotAllowed'
+        '409':
+          $ref: '#/components/responses/NoSpace'
+
+  /files/chunk/init:
+    post:
+      tags: [上传]
+      summary: 初始化分片上传（>= 100MB 自动走此流程）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileName, fileSize, chunkSize]
+              properties:
+                fileName: { type: string, example: movie.mp4 }
+                fileSize: { type: integer, format: int64, example: 1073741824 }
+                fileType: { type: string, example: video/mp4 }
+                chunkSize:
+                  type: integer
+                  description: 默认 5MB（5*1024*1024）；移动网络建议 2MB
+                  example: 5242880
+                resumeId:
+                  type: string
+                  description: 断点续传时带上上次的 uploadId
+                  example: up_7a1b2c
+            examples:
+              默认:
+                value:
+                  fileName: movie.mp4
+                  fileSize: 1073741824
+                  fileType: video/mp4
+                  chunkSize: 5242880
+      responses:
+        '200':
+          description: 初始化成功（若带 resumeId 则返回已收分片）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          uploadId: { type: string, example: up_7a1b2c }
+                          chunkSize: { type: integer, example: 5242880 }
+                          totalChunks: { type: integer, example: 205 }
+                          received:
+                            type: array
+                            items: { type: integer }
+                            example: [0, 1, 2, 3]
+                          resumed: { type: boolean, example: true }
+              example:
+                code: 0
+                message: ok
+                data:
+                  uploadId: up_7a1b2c
+                  chunkSize: 5242880
+                  totalChunks: 205
+                  received: [0, 1, 2, 3]
+                  resumed: true
+
+  /files/chunk/{uploadId}:
+    get:
+      tags: [上传]
+      summary: 查询已接收分片（断点续传用）
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      responses:
+        '200':
+          description: 已接收分片索引列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          received:
+                            type: array
+                            items: { type: integer }
+                            example: [0, 1, 2]
+                          totalChunks: { type: integer, example: 205 }
+
+  /files/chunk/{uploadId}/{index}:
+    put:
+      tags: [上传]
+      summary: 上传单个分片
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+        - in: path
+          name: index
+          required: true
+          schema: { type: integer, minimum: 0 }
+          description: 分片序号，从 0 开始
+          example: 4
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: 分片写入成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          index: { type: integer, example: 4 }
+                          receivedCount: { type: integer, example: 5 }
+        '413':
+          $ref: '#/components/responses/FileTooLarge'
+
+  /files/chunk/{uploadId}/complete:
+    post:
+      tags: [上传]
+      summary: 合并分片并完成上传
+      description: 校验分片完整性、计算 MD5、生成缩略图、扣减配额、写操作日志。
+      parameters:
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                md5:
+                  type: string
+                  description: 可选，客户端计算的整文件 MD5，服务端校验
+                  example: 5d41402abc4b2a76b9719d911017c592
+      responses:
+        '200':
+          description: 合并完成
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/File' }
+        '400':
+          description: 分片缺失
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponse' }
+              example:
+                code: 40006
+                message: 分片不完整，缺少索引 7
+                data: null
+
+  # ==================== 下载 ====================
+  /files/{fileId}/signed-url:
+    get:
+      tags: [下载]
+      summary: 生成 15 分钟签名下载 URL（防盗链）
+      description: 返回带 `k` 与 `exp` 的一次性 URL；服务端同时校验 `Referer` 白名单。
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: 生成成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            example: /files/f_2c91ab/download?k=8a1f...&exp=1763031300
+                          expiresAt: { type: integer, format: int64, example: 1763031300000 }
+
+  /files/{fileId}/download:
+    get:
+      tags: [下载]
+      summary: 下载文件（支持 Range 断点续传）
+      description: |
+        需携带签名参数 `k` 与 `exp`（由 `/signed-url` 生成）或 Bearer Token。
+        支持 `Range: bytes=start-end`，命中时返回 `206 Partial Content` 与 `Content-Range`。
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+        - in: query
+          name: k
+          schema: { type: string }
+          description: 签名令牌
+        - in: query
+          name: exp
+          schema: { type: integer, format: int64 }
+          description: 过期时间戳（毫秒）
+        - in: header
+          name: Range
+          schema: { type: string }
+          description: 字节范围
+          example: bytes=1048576-
+        - in: header
+          name: Referer
+          schema: { type: string }
+          description: 防盗链校验（白名单内域名）
+      responses:
+        '200':
+          description: 完整文件字节
+          headers:
+            Content-Disposition:
+              schema: { type: string }
+              description: 'attachment; filename="..."; filename*=UTF-8''''...'
+            Content-Length:
+              schema: { type: integer }
+            Accept-Ranges:
+              schema: { type: string, example: bytes }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '206':
+          description: 部分内容（断点续传）
+          headers:
+            Content-Range:
+              schema: { type: string, example: bytes 1048576-2048575/2048576 }
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/FileNotFound'
+        '401':
+          $ref: '#/components/responses/AuthFailed'
+
+  /files/{fileId}/thumbnail:
+    get:
+      tags: [下载]
+      summary: 获取缩略图（文档/图片首页）
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: 缩略图字节
+          content:
+            image/png:
+              schema: { type: string, format: binary }
+        '404':
+          $ref: '#/components/responses/FileNotFound'
+
+  # ==================== 文件管理 ====================
+  /files:
+    get:
+      tags: [文件管理]
+      summary: 分页查询当前用户文件列表
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, minimum: 1, default: 1 }
+        - in: query
+          name: size
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+        - in: query
+          name: keyword
+          schema: { type: string }
+          description: 按文件名模糊搜索
+        - in: query
+          name: fileType
+          schema: { type: string, enum: [image, video, audio, document, archive, other] }
+          description: 按类型筛选
+        - in: query
+          name: startTime
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: endTime
+          schema: { type: integer, format: int64 }
+        - in: query
+          name: sortBy
+          schema: { type: string, enum: [uploadTime, fileName, fileSize], default: uploadTime }
+        - in: query
+          name: order
+          schema: { type: string, enum: [asc, desc], default: desc }
+        - in: query
+          name: includeDeleted
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: 文件列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/FileList' }
+              example:
+                code: 0
+                message: ok
+                data:
+                  total: 42
+                  page: 1
+                  size: 20
+                  items:
+                    - fileId: f_2c91ab
+                      fileName: report.pdf
+                      fileSize: 2048576
+                      fileType: application/pdf
+                      storagePath: blobs/u_8f3a1c/f_2c91ab.bin
+                      thumbnailUrl: /files/f_2c91ab/thumbnail
+                      md5: d41d8cd98f00b204e9800998ecf8427e
+                      uploadTime: 1763030400000
+                      isDeleted: false
+                      shareId: null
+
+  /files/{fileId}:
+    get:
+      tags: [文件管理]
+      summary: 获取文件详情（元数据、缩略图 URL、MD5）
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: 文件详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/File' }
+        '404':
+          $ref: '#/components/responses/FileNotFound'
+    patch:
+      tags: [文件管理]
+      summary: 重命名 / 移动（同一用户空间内）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fileName:
+                  type: string
+                  description: 新文件名
+                  example: 年度报告.pdf
+                parentId:
+                  type: string
+                  description: 目标目录 id，根目录传 "/"
+                  example: /
+            examples:
+              重命名:
+                value:
+                  fileName: 年度报告.pdf
+              移动:
+                value:
+                  parentId: dir_9b2c
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/File' }
+    delete:
+      tags: [文件管理]
+      summary: 软删除（isDeleted=true，30 天后物理清理）
+      parameters:
+        - $ref: '#/components/parameters/FileId'
+      responses:
+        '200':
+          description: 已移入回收站
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          fileId: { type: string, example: f_2c91ab }
+                          deleted: { type: boolean, example: true }
+                          purgeAt:
+                            type: integer
+                            format: int64
+                            example: 1765622400000
+                            description: 预计物理清理时间（30 天后）
+        '404':
+          $ref: '#/components/responses/FileNotFound'
+
+  # ==================== 分享 ====================
+  /shares:
+    post:
+      tags: [分享]
+      summary: 创建分享链接（公开 / 加密，带过期时间）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileId]
+              properties:
+                fileId: { type: string, example: f_2c91ab }
+                expireDays: { type: integer, minimum: 1, maximum: 365, default: 7 }
+                encrypted: { type: boolean, default: false }
+                extractCode:
+                  type: string
+                  description: 加密模式提取码；不传则服务端生成 4 位
+                  example: 8k2p
+            examples:
+              公开分享:
+                value:
+                  fileId: f_2c91ab
+                  expireDays: 7
+                  encrypted: false
+              加密分享:
+                value:
+                  fileId: f_2c91ab
+                  expireDays: 3
+                  encrypted: true
+                  extractCode: 8k2p
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Share' }
+              example:
+                code: 0
+                message: ok
+                data:
+                  shareId: s_4d81e2
+                  fileId: f_2c91ab
+                  fileName: report.pdf
+                  fileSize: 2048576
+                  shareType: encrypted
+                  extractCode: 8k2p
+                  expireTime: 1763635200000
+                  downloadCount: 0
+                  createTime: 1763030400000
+                  shareUrl: https://qingliao-netdisk.app.workbuddy.host/s/s_4d81e2
+                  sharerName: 小明
+
+  /shares/{shareId}:
+    get:
+      tags: [分享]
+      summary: 查询分享信息（聊天中解析分享卡片用）
+      description: 加密模式需在查询串带 `code`，否则返回 40005。
+      security: []
+      parameters:
+        - in: path
+          name: shareId
+          required: true
+          schema: { type: string, example: s_4d81e2 }
+        - in: query
+          name: code
+          schema: { type: string, example: 8k2p }
+      responses:
+        '200':
+          description: 分享信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/Share' }
+        '410':
+          $ref: '#/components/responses/ShareExpired'
+
+  /shares/{shareId}/download:
+    get:
+      tags: [分享]
+      summary: 下载分享文件（同样支持 Range）
+      security: []
+      parameters:
+        - in: path
+          name: shareId
+          required: true
+          schema: { type: string }
+        - in: query
+          name: code
+          schema: { type: string }
+        - in: header
+          name: Range
+          schema: { type: string }
+      responses:
+        '200':
+          description: 文件字节
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '206':
+          description: 部分内容
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        '410':
+          $ref: '#/components/responses/ShareExpired'
+
+  # ==================== 存储与监控 ====================
+  /storage:
+    get:
+      tags: [存储与监控]
+      summary: 查询存储空间用量与配额
+      responses:
+        '200':
+          description: 用量信息
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/StorageInfo' }
+              example:
+                code: 0
+                message: ok
+                data:
+                  usedBytes: 1073741824
+                  totalBytes: 10737418240
+                  usedPercent: 10
+                  fileCount: 42
+                  recycledBytes: 52428800
+
+  /metrics:
+    get:
+      tags: [存储与监控]
+      summary: 关键接口性能监控（仅服务密钥可见）
+      description: 返回各接口响应时间 P50/P95、成功率、限流次数。
+      parameters:
+        - in: header
+          name: X-Service-Key
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 监控数据
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ApiResponse' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access Token，有效期 2 小时
+
+  parameters:
+    FileId:
+      in: path
+      name: fileId
+      required: true
+      schema: { type: string, example: f_2c91ab }
+      description: 文件唯一 id
+    UploadId:
+      in: path
+      name: uploadId
+      required: true
+      schema: { type: string, example: up_7a1b2c }
+      description: 分片上传会话 id
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: integer
+          description: 0 成功，其余见错误码表
+          example: 0
+        message:
+          type: string
+          example: ok
+        data:
+          nullable: true
+          description: 业务数据，失败时为 null
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+        expiresIn:
+          type: integer
+          description: Access Token 有效秒数
+          example: 7200
+        userId: { type: string, example: u_8f3a1c }
+        nickname: { type: string, example: 小明 }
+
+    File:
+      type: object
+      properties:
+        fileId: { type: string, example: f_2c91ab }
+        userId: { type: string, example: u_8f3a1c }
+        fileName: { type: string, example: report.pdf }
+        fileSize: { type: integer, format: int64, example: 2048576 }
+        fileType: { type: string, example: application/pdf }
+        storagePath:
+          type: string
+          example: blobs/u_8f3a1c/f_2c91ab.bin
+          description: 服务端内部相对路径，客户端不应直接使用
+        thumbnailUrl: { type: string, example: /files/f_2c91ab/thumbnail }
+        md5: { type: string, example: d41d8cd98f00b204e9800998ecf8427e }
+        uploadTime: { type: integer, format: int64, example: 1763030400000 }
+        isDeleted: { type: boolean, example: false }
+        deletedAt: { type: integer, format: int64, example: 0 }
+        shareId: { type: string, nullable: true, example: null }
+        parentId: { type: string, example: / }
+
+    FileList:
+      type: object
+      properties:
+        total: { type: integer, example: 42 }
+        page: { type: integer, example: 1 }
+        size: { type: integer, example: 20 }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/File' }
+
+    Share:
+      type: object
+      properties:
+        shareId: { type: string, example: s_4d81e2 }
+        fileId: { type: string, example: f_2c91ab }
+        fileName: { type: string, example: report.pdf }
+        fileSize: { type: integer, format: int64, example: 2048576 }
+        shareType: { type: string, enum: [public, encrypted], example: public }
+        extractCode: { type: string, nullable: true, example: null }
+        expireTime: { type: integer, format: int64, example: 1763635200000 }
+        downloadCount: { type: integer, example: 0 }
+        createTime: { type: integer, format: int64, example: 1763030400000 }
+        shareUrl: { type: string, example: https://qingliao-netdisk.app.workbuddy.host/s/s_4d81e2 }
+        sharerName: { type: string, example: 小明 }
+
+    StorageInfo:
+      type: object
+      properties:
+        usedBytes: { type: integer, format: int64, example: 1073741824 }
+        totalBytes: { type: integer, format: int64, example: 10737418240 }
+        usedPercent: { type: number, format: float, example: 10 }
+        fileCount: { type: integer, example: 42 }
+        recycledBytes: { type: integer, format: int64, example: 52428800 }
+
+  responses:
+    AuthFailed:
+      description: 认证失败（40001）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40001
+            message: Token 已过期，请刷新
+            data: null
+    FileTooLarge:
+      description: 文件过大（40002）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40002
+            message: 单文件超过 2GB 上限
+            data: null
+    TypeNotAllowed:
+      description: 类型不允许（40003）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40003
+            message: 文件类型不在白名单内
+            data: null
+    NoSpace:
+      description: 空间不足（40004）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40004
+            message: 存储空间不足
+            data: null
+    ShareExpired:
+      description: 分享过期或提取码错误（40005）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40005
+            message: 分享链接已过期
+            data: null
+    FileNotFound:
+      description: 文件不存在（40006）
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40006
+            message: 文件不存在
+            data: null
+    Conflict:
+      description: 账号已存在
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiResponse' }
+          example:
+            code: 40001
+            message: 该账号已注册
+            data: null

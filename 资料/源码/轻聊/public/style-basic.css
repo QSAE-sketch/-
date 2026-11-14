@@ -1,0 +1,186 @@
+/* 轻聊 · 基础版样式（第三档，面向最古老的内核）
+ *
+ * 比 style-lite.css 更保守，禁用清单：
+ *   ✗ position: fixed / sticky —— Android 5.x WebView 有已知重绘 bug，
+ *     滚动后 fixed 层会错位或留残影，表现就是「看着在、点不到」。
+ *   ✗ flex / grid / CSS 变量 / border-radius / box-shadow
+ *   ✗ transition / animation / transform / @supports
+ *   ✗ calc() / vh / vw / rem / aspect-ratio
+ *   ✗ 伪元素做布局（:before/:after 只用于装饰，不承载结构）
+ *
+ * 只用：table / block / inline-block / float + 写死的实色 + 百分比宽度。
+ * 等分导航一律用 table 单元格（永不溢出），不用百分比硬凑。
+ */
+
+html, body { margin: 0; padding: 0; }
+body {
+  background: #eef1f6;
+  color: #1f2328;
+  font-size: 15px;
+  line-height: 1.5;
+  font-family: "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  -webkit-text-size-adjust: 100%;
+}
+a { color: #1a5fd0; text-decoration: none; }
+/* 不加 !important：整版靠 inline style.display 切屏 */
+.hide { display: none; }
+.dim { color: #7a8494; font-size: 12px; }
+.err { color: #c9252d; font-size: 13px; min-height: 18px; }
+
+/* ---------- 顶栏 ---------- */
+.hd {
+  background: #ffffff;
+  border-bottom: 1px solid #d5dbe3;
+  padding: 9px 10px;
+  font-size: 16px;
+  font-weight: bold;
+  overflow: hidden;
+}
+.hd .hdR { float: right; font-weight: normal; font-size: 12px; }
+.hd .hdR .bt { margin-left: 5px; }
+
+/* ---------- 导航（table 等分，永不溢出） ---------- */
+table.nav { width: 100%; border-collapse: collapse; background: #ffffff; }
+table.nav td.nv {
+  width: 20%;
+  padding: 10px 0;
+  text-align: center;
+  font-size: 13px;
+  color: #5a646f;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+table.nav td.nv.on { color: #1a5fd0; font-weight: bold; border-bottom-color: #1a5fd0; }
+
+/* ---------- 内容 ---------- */
+.bd { padding: 10px 9px 24px; }
+.card {
+  background: #ffffff;
+  border: 1px solid #d5dbe3;
+  margin-bottom: 9px;
+}
+.card .ch {
+  padding: 7px 10px;
+  background: #e8edf4;
+  border-bottom: 1px solid #d5dbe3;
+  font-size: 13px;
+  font-weight: bold;
+  color: #4a5563;
+}
+.card .cb { padding: 9px 10px; }
+.line { padding: 8px 10px; border-bottom: 1px solid #edf0f4; overflow: hidden; }
+.line.last { border-bottom: 0; }
+.line .lm { display: inline-block; width: 70%; vertical-align: middle; }
+.line .lr { display: inline-block; width: 28%; text-align: right; vertical-align: middle; }
+.lt { font-size: 14px; }
+.ls { color: #7a8494; font-size: 12px; }
+.empty { padding: 16px 10px; color: #7a8494; font-size: 13px; text-align: center; }
+
+/* ---------- 表单 ---------- */
+.ti {
+  width: 100%;
+  height: 38px;
+  padding: 0 7px;
+  border: 1px solid #c3ccd8;
+  background: #ffffff;
+  color: #1f2328;
+  font-size: 15px;
+  margin: 0 0 7px 0;
+}
+.ti.short { width: 62%; margin-bottom: 0; }
+label.fl { display: block; font-size: 13px; color: #4a5563; margin-bottom: 3px; }
+
+/* ---------- 按钮 ---------- */
+.bt {
+  display: inline-block;
+  padding: 7px 12px;
+  border: 1px solid #c3ccd8;
+  background: #ffffff;
+  color: #1a5fd0;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.bt.bp { background: #1a5fd0; border-color: #1a5fd0; color: #ffffff; }
+.bt.bd2 { background: #c9252d; border-color: #c9252d; color: #ffffff; }
+.bt.bw { background: #a86700; border-color: #a86700; color: #ffffff; }
+.bt.bg { background: #ffffff; color: #1a5fd0; }
+.bt.full { display: block; width: 100%; padding: 11px 0; font-size: 15px; }
+.bt.sm { padding: 4px 8px; font-size: 12px; }
+.bt.off { color: #9aa3ae; border-color: #dfe4ea; background: #f5f7fa; }
+
+/* 登录页双 tab */
+table.tabs2 { width: 100%; border-collapse: collapse; margin-bottom: 9px; }
+table.tabs2 td {
+  width: 50%; padding: 9px 0; text-align: center; font-size: 14px;
+  border: 1px solid #c3ccd8; background: #ffffff; color: #5a646f; cursor: pointer;
+}
+table.tabs2 td.on { background: #1a5fd0; border-color: #1a5fd0; color: #ffffff; font-weight: bold; }
+
+/* ---------- 消息 ---------- */
+.mrow { padding: 7px 0; border-bottom: 1px solid #f0f3f7; overflow: hidden; }
+.mav {
+  float: left; width: 30px; height: 30px; line-height: 30px;
+  text-align: center; color: #ffffff; font-weight: bold; font-size: 13px;
+}
+.mbody { margin-left: 38px; }
+.mwho { font-size: 12px; color: #1a5fd0; font-weight: bold; }
+.mtxt { font-size: 15px; margin-top: 1px; }
+.mmeta { font-size: 11px; color: #8c9500; color: #8c949f; }
+.mfile {
+  display: block; margin-top: 4px; padding: 6px 8px;
+  background: #eef3fb; border: 1px solid #cfdcf0; font-size: 13px; color: #1a5fd0;
+}
+.msys {
+  margin: 9px 0; padding: 6px 9px; background: #e8edf4;
+  border: 1px solid #d5dbe3; color: #5a646f; font-size: 12px; text-align: center;
+}
+
+/* ---------- 发送行 ---------- */
+.sendbox {
+  background: #ffffff;
+  border-top: 1px solid #d5dbe3;
+  padding: 8px 9px;
+}
+.sendbox .ti { width: 100%; margin: 0 0 7px 0; }
+table.srow { width: 100%; border-collapse: collapse; }
+table.srow td { padding: 0; vertical-align: middle; }
+.fi { font-size: 11px; width: 100%; }
+
+/* ---------- 提示条 ---------- */
+.tipbar {
+  padding: 7px 10px; font-size: 12px;
+  background: #fff6e0; border: 1px solid #e6d3a3; color: #7a5a00;
+  margin-bottom: 9px;
+}
+.okbar {
+  padding: 7px 10px; font-size: 12px;
+  background: #e8f6ec; border: 1px solid #b7dfc3; color: #1a6b34;
+  margin-bottom: 9px;
+}
+
+/* ---------- 自检面板 ---------- */
+#diag {
+  background: #ffffff; border: 1px solid #d5dbe3; margin: 9px;
+  font-size: 12px;
+}
+#diag .dh { padding: 7px 9px; background: #e8edf4; font-weight: bold; font-size: 13px; }
+#diag .db { padding: 8px 9px; }
+#diag table { width: 100%; border-collapse: collapse; }
+#diag td { padding: 3px 2px; border-bottom: 1px solid #f0f3f7; font-size: 12px; vertical-align: top; }
+#diag td.k { width: 42%; color: #4a5563; }
+#diag td.v { width: 58%; }
+#diag .good { color: #1a7f37; }
+#diag .bad { color: #c9252d; font-weight: bold; }
+#diag pre {
+  margin: 6px 0 0; padding: 6px; background: #f5f7fa; border: 1px solid #e3e8ee;
+  font-size: 11px; white-space: pre-wrap; word-break: break-all;
+  font-family: Consolas, Menlo, monospace; max-height: 180px; overflow: auto;
+}
+
+/* 底部版本切换 */
+.capfoot { padding: 14px 9px 26px; text-align: center; font-size: 12px; color: #7a8494; }
+.capfoot a { margin: 0 4px; }

@@ -1,0 +1,43 @@
+# 发现：符号语 MoE 训练 — GPU 加速关键经验
+
+日期：2026-09-01
+来源：上古混沌符号语 AI v2.0 训练（D:\符号语AI训练\）
+
+## 1. C++ 方案在无 MSVC 机器上不可行（重要）
+- NVIDIA nvcc 官方只支持 **MSVC** 编译 host 代码；MinGW/g++ 从 CUDA 12 起不被官方支持。
+- 本机（机器1）只有 MinGW-w64，无 MSVC Build Tools → C++ 写训练程序 + 装 CUDA Toolkit 走不通。
+- **正解**：Python + `pip install torch --index-url https://download.pytorch.org/whl/cu128`。
+  torch 的 cu128 wheel **自带 CUDA runtime**（2.3GB），装完 torch.cuda.is_available() 即为 True，**不需要单独装 CUDA Toolkit / 不需要 nvcc**。
+
+## 2. Blackwell 卡（RTX 5060）上 nn.MultiheadAttention 是慢路径
+- 初版用 `nn.MultiheadAttention`：200M 模型 8.8s/步（全量训练要 10+ 小时）。
+- 换 `F.scaled_dot_product_attention`（SDPA/flash）+ 手写 QKV 投影后：0.82s/步，**提速 12 倍**。
+- 教训：Blackwell/新卡上训练务必用 SDPA，别用 nn.MultiheadAttention。
+
+## 3. SDPA flash 的 head_dim 必须是 64 的倍数
+- 1280 维 / 16 头（head_dim=80）：2.4s/步 且 loss 异常（11.x，不下降）→ 慢路径。
+- 改 1280/20 头（head_dim=64）：速度正常。
+- 1408/22 头（head_dim=64）也正常（381M 能训）。
+- 配置公式：n_embd / n_head = 64 或 128 的整数。
+
+## 4. 训练切块长度必须与模型 pos embedding 一致
+- 模型 block=128 但 train_lm 默认 block=256 切块 → CUDA device-side assert（embedding 越界）。
+- 修法：main 里传 `block=mcfg["block"]`，训练循环用模型自身的 block。
+
+## 5. 本机（8GB 显存）从零训练规模上限
+- 专家 ~200M（1024/16头/16层/block256）：0.82s/步，1920 步 ≈ 27 分钟训好。
+- 路由 ~315M（1280/20头/16层）：0.27s/步（输入短），2000 步 ≈ 7 分钟，分类 acc 100%。
+- 300M+ 模型在 8GB 卡上 bf16 + 梯度累积可跑，但激活显存紧张（~7.3GB/8.1GB）。
+- 1B/1.5B 从零训练需要 24GB+ 显存（4090/A100 级），本机不可行。
+
+## 6. 小语料 + 大模型：1920 步 loss 收敛参考
+- greet 3034 条语料 → 202M 模型 1920 步 loss 0.17；game 2117 条 → loss 0.15。
+- 步数太少（<500）时 loss 停在 5.x（接近随机 log170≈5.14），无意义。
+- 这批双向符号语语料总量 18,135 条，词表仅 170（纯符号字符）。
+
+## 附：训练命令速查
+```bash
+# venv 环境
+"C:\Users\Administrator\.workbuddy\binaries\python\envs\default\Scripts\python.exe" train.py --topic greet --steps 1920 --bs 16
+python train.py --all        # 全量（5专家+路由，约2.5小时）
+```

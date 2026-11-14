@@ -1,0 +1,84 @@
+plugins {
+    id 'com.android.application'
+}
+
+// 版本号唯一来源：项目根目录的 version.json。
+// 网站设置页「关于」显示的也是这份文件（由 /api/version 实时下发），
+// 两边共用同一个值，不会再出现 APK 写着旧版本、线上其实已经更新的情况。
+import groovy.json.JsonSlurper
+def appVersion = new JsonSlurper().parse(rootProject.file('../version.json'))
+
+// 签名配置从 keystore.properties 读取（该文件不在版本库中，但本次交付随工程附带）
+def keystoreProps = new Properties()
+def keystorePropsFile = rootProject.file('keystore.properties')
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+def hasReleaseKeystore = keystoreProps.containsKey('storeFile')
+
+android {
+    namespace 'com.qingliao.app'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.qingliao.app"
+        // 兼容到 Android 4.4（API 19）：红米 Note 2 的最低系统版本
+        minSdk 19
+        targetSdk 34
+        versionCode appVersion.code as int
+        versionName appVersion.name
+    }
+
+    signingConfigs {
+        release {
+            if (hasReleaseKeystore) {
+                storeFile rootProject.file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ".debug"
+            versionNameSuffix "-debug"
+        }
+        release {
+            // 不开启混淆/资源压缩：保证与站点原有行为完全一致（容器层无业务代码可混淆）
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        // 旧版兼容写法（legacy openFileChooser）会触发 NewApi 提示，不阻断构建
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    // 产物文件名固定为「轻聊.apk」，不缀版本号。
+    // 版本号只在应用内「设置 → 关于」展示（由线上 /api/version 实时下发），
+    // 文件名/应用名都不带版本，避免「看着是旧包、其实内容早已更新」。
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (variant.buildType.name == 'release') {
+                outputFileName = '轻聊.apk'
+            }
+        }
+    }
+}
+
+// 无任何第三方依赖：仅使用 Android 平台 API
+dependencies {
+}

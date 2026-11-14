@@ -1,0 +1,30 @@
+【事件】MDZNT 桌面版 · 运行按钮重写最终交付
+时间：2026-07-18 约 21:11–21:45
+触发：用户投诉"点运行啥也没弹出、不建文件夹、不能桌面直接点"
+
+一、根因
+- 旧实现：HTML/JS/CSS 只在聊天框内嵌 iframe 预览（非真窗口、没法玩、不落盘）；Python 要么缺解释器报错，要么 capture_output 抓输出不弹窗口。
+- 用户期望：点运行 → 真弹窗口能玩 + 自动存到桌面文件夹能直接点。
+
+二、改动（已写入源码）
+- 后端 workbuddy_chatbot.py 重写 run_code + 新增 _projects_root / _save_project / _is_gui_code / open_in_explorer：
+  · 所有语言先落盘 桌面/MDZNT作品/<时间戳>_<类型>/（HTML→index.html；CSS/JS 包成 index.html；Python→main.py）
+  · HTML/JS/CSS → os.startfile(index.html) 调默认浏览器真打开（能玩）
+  · Python 检测 GUI/游戏 → subprocess.Popen([exe,path], creationflags=0x10) 开新控制台窗口（tkinter 直接能玩）
+  · 非 GUI 的 CLI → 仍捕获输出到聊天框，同时落盘
+  · 返回带 folder 字段
+- 桥 app_launcher.py：run_code 转发 bot.run_code；open_path（桥名）转发 bot.open_in_explorer
+- 前端 index.html：runCodeCard 改为全语言走后端 API（去掉内联 iframe），结果区显示"已打开+文件已保存路径"，加「📂 在文件夹打开」按钮 → api.open_path → os.startfile(folder)
+
+三、校验（未偷懒）
+- 写测试桩（拦截 os.startfile/subprocess.Popen）真跑 16 项全过：HTML 真调浏览器、Python 游戏走新控制台、CLI 仍抓输出不弹窗、落盘路径正确、folder 字段齐全
+- JS 初版因替换 runCodeCard 残留多余 } 致 node --check 报错，删多余 } 复检 EXIT=0
+
+四、交付
+- 弱机串行重打包：便携版 version_tag=True(21:11) → 自用版 False(21:12)
+- 复制：便携版 → 桌面 MDZNT便携版/（清 PowerShell 嵌套 _internal 残留、覆盖 exe+_internal、保留 config/models/cmd/txt）；两版 onedir → U盘 资料/游戏成果/（便携版/自用版）
+- 三处 index.html 实测均含新逻辑（在文件夹打开/run_code/open_path/MDZNT作品 =1）
+- 桥接链路确认正确（前端 open_path 桥名 → bot.open_in_explorer → os.startfile）
+
+五、当前状态
+两版可交付。点运行→HTML 真浏览器打开 / Python 游戏新窗口 + 自动落盘桌面 MDZNT作品/，结果区「在文件夹打开」直达文件夹。

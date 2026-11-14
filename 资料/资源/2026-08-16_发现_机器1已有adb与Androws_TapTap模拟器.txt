@@ -1,0 +1,9 @@
+发现 · 机器1 已有 adb 与 Androws/TapTap 安卓模拟器（2026-08-16 探查）
+
+- 探查"手搓能用APK的工具"时发现，机器1（SK-20260324ZSZO）其实已有安卓运行时基础：
+  - adb.exe 两处：C:\Users\Administrator\AndroidSDK\platform-tools\adb.exe、D:\android-sdk\platform-tools\adb.exe（Android Debug Bridge 1.0.41）。
+  - 已装第三方模拟器：腾讯 Androws（D:\Program Files\Tencent\Androws）、TapTap 模拟器（D:\TapTap\Support\android_emulator），均自带 adb。
+  - D:\android-emu-build 项目（Google 官方模拟器 + Android 15，PyInstaller 打包）当时目录基本为空（仅 .android 配置），未真正搭好。
+- 现状（当时）：`adb devices` 为空 → 没有任何模拟器/设备在线，APK 暂无法"用"起来。
+- 结论：要"用"APK（装进模拟器跑）只需启动任一模拟器（Androws / TapTap 最省事），再 `adb install xxx.apk` 即可；本机条件已满足，无需额外下载。
+- 注：大佬最终放弃做 APK 使用工具（嫌步骤麻烦）。

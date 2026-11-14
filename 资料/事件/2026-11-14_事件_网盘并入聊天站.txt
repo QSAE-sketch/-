@@ -1,0 +1,64 @@
+【2026-11-14】轻聊 v1.7.0：云网盘并入聊天站（放弃独立发布），共用一份文件与配额
+
+一、为什么改方案
+- 平台一个工作区只有一个线上应用位。上一轮把 netdisk/ 拿去发布，直接把聊天站覆盖掉了
+  （返回的 shareLink 没变就是覆盖）。所以「网盘独立发布」这条路走不通。
+- 改为把网盘做成聊天站的内置模块。这不只是省一个应用位，反而更对：
+  网盘直接读 files 集合，聊天里发出的文件**天生就在网盘里**，不需要任何转存动作；
+  配额、云端持久化、分片断点续传全部沿用同一套实现，不会出现「聊天算一份、网盘算一份」。
+
+二、后端（chatapp）
+- 新增 src/drive.js，导出 registerDrive(deps) 注册 14 个接口：
+  · GET  /api/drive/storage              配额 + 文件数 + 回收站数
+  · GET  /api/drive/files                列表（keyword / type / folder / sort=time|size|name / 分页）
+  · GET  /api/drive/files/:id            详情（≤8MB 时按需算 md5 并写回缓存）
+  · PATCH /api/drive/files/:id           重命名 + 移动目录（folder）
+  · DELETE /api/drive/files/:id          软删除进回收站（deletedAt）
+  · GET  /api/drive/trash                回收站（含剩余天数）
+  · POST /api/drive/trash/:id/restore    恢复
+  · DELETE /api/drive/trash/:id          彻底删除（物理删 blob + 清分享）
+  · POST /api/drive/files/:id/share      分享（有效期支持小数天，加密可选提取码；同文件复用一条）
+  · GET  /api/drive/shares               我的分享
+  · DELETE /api/drive/shares/:id         取消分享
+  · GET  /api/drive/s/:sid               公开分享信息（无需登录，?code= 校验）
+  · GET  /api/drive/s/:sid/dl            公开下载（无需登录，计下载次数）
+  · GET  /api/rooms/:id/files            会话共享文件聚合（按类型筛选）
+- 上传不另开接口：POST /api/files/init 时 roomId 留空即为网盘文件，分片/断点/配额全复用。
+- src/db.js：新增 shares 集合索引（k1=userId, k2=fileId）。
+- src/filestore.js：新增 readAll(fileId)，仅给 md5 这类明确知道体积上限的场景用。
+- server.js：
+  · guardFileAccess 增加 deletedAt 拦截（回收站里的文件任何入口都 404，分享链接同步失效）
+  · decorateMessage 的 file 增加 deleted 标记（聊天里保留消息，但不再给预览/下载）
+  · 移除旧的 NETDISK_URL 外部转发（saveToNetdisk）与相关常量
+  · /api/version 下发 drive.enabled，netdiskUrl 恒为空（兼容旧前端）
+  · 启动 + 每小时执行 drive.purgeTrash()，回收站满 30 天物理删除
+
+三、前端
+- 标准版：底部导航新增「网盘」（公共/房间/好友/网盘/我的）。
+  网盘页含配额条、我的文件/回收站/我的分享三段、搜索、类型 chips、目录 chips、排序、分页；
+  文件点开是详情弹层（图片/视频/音频内联预览、md5、分享状态）+ 下载/重命名/移动/分享/删除。
+- 低配版：新增「网盘」导航与页面，纯 ES5 + 行内按钮，含配额、搜索、上传、下载、删除、回收站。
+- 两版都支持 ?view=drive 直达；「我的」页保留网盘入口。
+- 修复：低配版底部导航 `.tb { width: 24% }` 在加第 5 个标签后溢出 120%，改为 19.6%。
+- 修复：标准版「低配兼容模式」链接原本 fixed 在 bottom:4px，压在底部导航上；
+  改为顶栏右侧的小按钮（服务器 href 注入逻辑保持不变）。
+
+四、验证
+- 新增 test/drive.js 93 项（自带 3316 独立服务）：列表/搜索/筛选/排序/分页、详情 md5、
+  重命名与移动、回收站三态与配额释放、分享公开/加密/过期/取消、权限隔离、配额闸门、会话文件聚合。
+- 全量回归：本地 705/0、云端 705/0。
+- 线上冒烟 tools/live-smoke-drive.js 33/33（含真实上传→分享→匿名下载→回收站→恢复→彻底删除→注销清理）。
+- 无头 Chrome 截图逐块核对：网盘页、低配网盘页、文件详情弹窗，并据此修掉两处布局问题。
+
+五、踩坑记录（值得记）
+- 冒烟脚本报「恢复后可下载 404」，一度怀疑产品逻辑。实际是**脚本自己把 URL 写错了**：
+  写成了 /api/drive/files/:id/download（该路由不存在），正确是 /api/files/:id/download（网盘不另开下载）。
+  排查方式：写一个最小复现脚本（注册→上传→下载→软删→恢复→下载）打印每步状态，
+  与冒烟脚本逐步比对，10 分钟定位。教训：冒烟失败先怀疑脚本，别先改产品。
+- chrome headless 的最小窗口宽度约 500px。用 --window-size=420 时实际按 500 布局、截图却只截 420，
+  看起来像「右侧被裁」。用 500 宽截图才是真实布局。
+
+六、现状与遗留
+- chatapp/ 就是唯一的线上应用，含聊天 + 网盘，版本 1.7.0 / code 11。
+- netdisk/ 独立项目保留但**不要发布**（README 顶部已写明），作为未来有第二个应用位时的备用方案。
+- 源码已同步 资料/源码/轻聊/ 与 资料/源码/云网盘/。

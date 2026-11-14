@@ -1,0 +1,23 @@
+# 2026-09-27 发现：裸机内核工具链与踩坑（机器1）
+
+## 工具链事实（2026-09-26/27 实测）
+- MinGW g++ 只能出 PE 格式，ld 无 elf_i386 仿真 → 裸机 ELF 必须走 clang + ld.lld
+- MSYS2 nasm 装在 usr/bin（不是 mingw64/bin）
+- pacman 装 mingw-w64-x86_64-llvm 会卡死在解压（30分钟+），绕法：不装 llvm，用 Python 写 ELF→bin 转换（解析 PT_LOAD 段）
+- pip 清华镜像会抽风，阿里镜像稳
+- VirtualBox: VBE 测试用 --graphicscontroller vboxvga（VMSVGA 的 VBE 不全）
+- VirtualBox 的 VBE 4F01 查询模式不能带 0x4000 LFB 位，4F02 设置时才带；且要遍历模式表找 640x480x32（写死 0x4112 会 FAIL）
+- VirtualBox ACPI 关机端口：outw(0x4004, 0x3400) 实测有效
+
+## 裸机 C 内核踩坑清单
+- 引导扇区 512B 硬限：PM 跳板代码也必须在前 510 字节内
+- NASM 3.x: cmp mem,imm 在 -O2 两遍编码不一致 → label-redef-late，先过寄存器绕过
+- int13h 扩展读 DAP: LBA 字段 8 字节，短了会被后面变量污染 → DISK ERR
+- .bss 不随文件加载，crt0 要 rep stosl 清零
+- freestanding: 无 size_t、无 libgcc（64位除法要自己写 __udivdi3 系）
+- 自写 strchr 处理 c==0 的边界（循环版遇 NUL 返回 NULL）
+- 中文字库方案：构建时 Pillow 扫源码字符 → simsun.ttc 16px → 16x16 点阵数组（344字仅11KB），改文案自动重生成
+
+## 无头测试方法论（通用）
+VBoxManage startvm --type headless + controlvm screenshotpng（截图验证显示）
++ controlvm keyboardputscancode（注入按键）+ showvminfo VMState（验证电源）= 不看窗口的完整测试闭环

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>流星逃逸 Meteor Dodger</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#05060f; font-family:Arial, sans-serif; touch-action:none; }
+  #game { display:block; width:100%; height:100%; }
+  #hud { position:fixed; top:8px; left:0; right:0; text-align:center; color:#7ee8fa; font-size:16px; font-weight:bold; text-shadow:0 0 8px rgba(126,232,250,.6); pointer-events:none; z-index:10; }
+  #overlay { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(5,6,15,.88); z-index:20; color:#fff; text-align:center; }
+  #overlay h1 { font-size:34px; color:#7ee8fa; margin-bottom:8px; text-shadow:0 0 12px rgba(126,232,250,.5); }
+  #overlay p { font-size:15px; color:#aab; margin:4px 0; }
+  #overlay .big { font-size:22px; color:#ffb46b; margin:10px 0; }
+  #btn { margin-top:18px; padding:12px 40px; font-size:18px; border:none; border-radius:30px; background:#ff8c42; color:#fff; cursor:pointer; box-shadow:0 4px 14px rgba(255,140,66,.4); }
+  #btn:active { transform:scale(.95); }
+</style>
+</head>
+<body>
+<div id="hud">得分 0 · 存活 0.0s</div>
+<div id="overlay">
+  <h1>☄ 流星逃逸</h1>
+  <p>触屏：按住左右拖动飞船 · 键盘：←/→ 或 A/D</p>
+  <p>躲开陨石，撑得越久分越高</p>
+  <div class="big" id="final">—</div>
+  <button id="btn">开始躲避</button>
+</div>
+<canvas id="game"></canvas>
+<script>
+(function(){
+  const cv = document.getElementById('game');
+  const ctx = cv.getContext('2d');
+  const hud = document.getElementById('hud');
+  const overlay = document.getElementById('overlay');
+  const final = document.getElementById('final');
+  const btn = document.getElementById('btn');
+
+  let W = 0, H = 0, dpr = 1;
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = cv.clientWidth = window.innerWidth;
+    H = cv.clientHeight = window.innerHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize);
+
+  const SHIP_W = 34, SHIP_H = 26;
+  let shipX = 0, shipTargetX = 0;
+  let meteors = [], comets = [], stars = [];
+  let score = 0, time = 0, running = false;
+  let spawnTimer = 0, diff = 1, last = 0, raf = 0;
+
+  function reset(){
+    shipX = W/2; shipTargetX = W/2;
+    meteors = []; comets = []; score = 0; time = 0;
+    spawnTimer = 0; diff = 1;
+    for (let i=0;i<70;i++){
+      stars.push({ x: Math.random()*W, y: Math.random()*H, r: Math.random()*1.6+0.3, s: Math.random()*0.4+0.1 });
+    }
+  }
+
+  function spawnMeteor(){
+    // 速度单位是「像素/秒」（m.y += vy*dt），之前写成 2-5 导致陨石几乎不动
+    const speed = 55 + diff * 14;
+    const size = 16 + Math.random()*22 + diff*2;
+    meteors.push({ x: Math.random()*W, y: -30, vx: (Math.random()-0.5)*30, vy: speed, r: size, rot: Math.random()*Math.PI*2, vr: (Math.random()-0.5)*0.1 });
+  }
+  function spawnComet(){
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    comets.push({ x: dir>0 ? -40 : W+40, y: Math.random()*H*0.6, vx: dir*(200+diff*25), vy: (Math.random()-0.3)*30, len: 60+Math.random()*50 });
+  }
+
+  function update(dt){
+    time += dt; diff = 1 + time/30;
+    spawnTimer -= dt;
+    // 同屏陨石上限：最多 12 个，防止生成太快堵死通道
+    if (spawnTimer <= 0 && meteors.length < 12){
+      spawnMeteor();
+      spawnTimer = Math.max(0.35, 1.0 - time/120);
+      if (time > 25 && Math.random() < 0.12) spawnComet();
+    }
+    shipX += (shipTargetX - shipX) * Math.min(1, dt*10);
+
+    for (const s of stars){ s.y += s.s; if (s.y > H){ s.y = -2; s.x = Math.random()*W; } }
+
+    for (let i=meteors.length-1;i>=0;i--){
+      const m = meteors[i];
+      m.x += m.vx*dt; m.y += m.vy*dt; m.rot += m.vr*dt;
+      if (m.y > H+40){ meteors.splice(i,1); score++; continue; }
+      // 碰撞
+      const dx = shipX - m.x, dy = H-60 - m.y;
+      const rr = m.r + SHIP_W/2.5;
+      if (dx*dx + dy*dy < rr*rr) gameOver();
+    }
+    for (let i=comets.length-1;i>=0;i--){
+      const c = comets[i];
+      c.x += c.vx*dt; c.y += c.vy*dt;
+      if (c.x < -80 || c.x > W+80){ comets.splice(i,1); continue; }
+      const dx = shipX - c.x, dy = (H-60) - c.y;
+      if (Math.abs(dx) < SHIP_W/2+10 && Math.abs(dy) < SHIP_H/2+4) gameOver();
+    }
+  }
+
+  function draw(){
+    ctx.fillStyle = '#05060f';
+    ctx.fillRect(0,0,W,H);
+    // 星点
+    ctx.fillStyle = '#fff';
+    for (const s of stars){ ctx.globalAlpha = 0.5+Math.random()*0.3; ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,7); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    // 陨石
+    for (const m of meteors){
+      ctx.save(); ctx.translate(m.x,m.y); ctx.rotate(m.rot);
+      ctx.fillStyle = '#c94f2b';
+      ctx.beginPath(); ctx.arc(0,0,m.r,0,7); ctx.fill();
+      ctx.fillStyle = '#8f2f16';
+      ctx.beginPath(); ctx.arc(-m.r*0.2,-m.r*0.2,m.r*0.55,0,7); ctx.fill();
+      ctx.restore();
+    }
+    // 流星
+    ctx.strokeStyle = 'rgba(255,190,120,.7)';
+    ctx.lineWidth = 2.5;
+    for (const c of comets){
+      ctx.beginPath();
+      ctx.moveTo(c.x - c.vx*0.12, c.y - c.vy*0.12);
+      ctx.lineTo(c.x - c.vx*0.12 - c.len, c.y - c.vy*0.12);
+      ctx.stroke();
+    }
+    // 飞船
+    const sy = H-60;
+    ctx.fillStyle = '#7ee8fa';
+    ctx.beginPath();
+    ctx.moveTo(shipX, sy-14);
+    ctx.lineTo(shipX+17, sy+12);
+    ctx.lineTo(shipX+6, sy+6);
+    ctx.lineTo(shipX, sy+12);
+    ctx.lineTo(shipX-6, sy+6);
+    ctx.lineTo(shipX-17, sy+12);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#d7f9ff';
+    ctx.beginPath(); ctx.arc(shipX, sy-2, 5, 0, 7); ctx.fill();
+    // 尾焰
+    ctx.fillStyle = '#ff8c42';
+    ctx.beginPath();
+    ctx.moveTo(shipX-6, sy+10); ctx.lineTo(shipX+6, sy+10);
+    ctx.lineTo(shipX, sy+18+Math.random()*5);
+    ctx.closePath(); ctx.fill();
+  }
+
+  function loop(ts){
+    if (!running) return;
+    const dt = Math.min(0.05, (ts-last)/1000 || 0.016);
+    last = ts;
+    update(dt);
+    draw();
+    hud.textContent = '得分 ' + score + ' · 存活 ' + time.toFixed(1) + 's';
+    raf = requestAnimationFrame(loop);
+  }
+
+  function gameOver(){
+    running = false; cancelAnimationFrame(raf);
+    final.textContent = '💥 撞上了！存活 ' + time.toFixed(1) + ' 秒 · 得分 ' + score;
+    overlay.style.display = 'flex';
+  }
+
+  function start(){
+    reset(); overlay.style.display = 'none'; running = true; last = performance.now();
+    raf = requestAnimationFrame(loop);
+  }
+
+  // 键盘
+  window.addEventListener('keydown', (e)=>{
+    if (!running) return;
+    if (e.key==='ArrowLeft'||e.key==='a'||e.key==='A') shipTargetX = Math.max(SHIP_W/2, shipTargetX-45);
+    if (e.key==='ArrowRight'||e.key==='d'||e.key==='D') shipTargetX = Math.min(W-SHIP_W/2, shipTargetX+45);
+  });
+  // 触屏/鼠标拖动
+  cv.addEventListener('touchstart', (e)=>{ e.preventDefault(); touchMove(e); }, {passive:false});
+  cv.addEventListener('touchmove', (e)=>{ e.preventDefault(); touchMove(e); }, {passive:false});
+  function touchMove(e){
+    const t = e.touches ? e.touches[0] : e;
+    shipTargetX = Math.max(SHIP_W/2, Math.min(W-SHIP_W/2, t.clientX));
+  }
+  cv.addEventListener('mousemove', (e)=>{ if (running) shipTargetX = Math.max(SHIP_W/2, Math.min(W-SHIP_W/2, e.clientX)); });
+
+  btn.addEventListener('click', start);
+  resize(); reset(); draw();
+})();
+</script>
+</body>
+</html>

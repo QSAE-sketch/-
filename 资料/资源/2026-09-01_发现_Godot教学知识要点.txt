@@ -1,0 +1,47 @@
+# Godot 4.7.1 学习知识要点（2026-09-01）
+
+## 语言
+- GDScript：Godot 原生语言，类似 Python（def→func、加 var、缩进规则同）
+- 也支持 C#（官方）、godot-python（第三方 CPython 嵌入，Godot4 兼容性需自核）
+- 注：Python 3 同样支持中文变量名，并非"Python 不能写中文"
+
+## 核心概念
+- 项目：一个游戏一个项目文件夹
+- 节点 Node：所有东西都是节点，可组成树
+- 场景 Scene：节点组合保存
+- 脚本 Script：.gd 文件，给节点加行为
+- _ready()：进入场景树时执行一次
+- _process(delta)：每帧执行
+- print()：打印到输出面板
+
+## 变量
+- 声明：var 名字 = 值
+- 类型：String("") / int / float / bool(true,false)
+- 类型标注可选：var x: int = 100
+- 修改：名字 = 名字 + 1
+- 拼接：文字 + 文字；数字需 str(数字) 转文字才能接
+- 变量名不能以数字开头；可用中文 / 短字母 / 带前缀（x1）
+- 关键字 var 不能拼错（ver 是错的）
+- 普通语句行尾不加冒号；只有带代码块的关键字（func/if/for/while/class/else/elif）后需冒号
+
+## 信号 Signal（消息机制）
+- 定义：signal 信号名
+- 发送：信号名.emit()
+- 接收：信号名.connect(函数名) + func 函数名():
+- connect 两端需在场景树可达
+- 类比 TurboWarp：广播≈emit，当接收≈connect+func
+
+## 输入检测
+- 按钮：Button 节点 pressed 信号
+- 鼠标任意处：_input(event) 判断 InputEventMouseButton + pressed
+- 角色被点：Area2D + CollisionShape2D 的 input_event 信号（另有 mouse_entered/exited）
+
+## Inspector 属性名汉化
+- 内置属性名即 GDScript API 名（如 position），无独立显示名映射
+- 改显示不改代码需改 C++ 源码+重编译（机器1无 MSVC/MinGW，不可行）
+- 自己脚本属性可用中文变量名 @export var 血量 直接显示中文
+- 内置属性汉化可用 EditorInspectorPlugin 做显示层映射
+
+## 环境注意
+- 机器1（SK-20260324ZSZO）无 MSVC/MinGW，无法编译 Godot C++ 源码
+- Godot 4.7.1 安装包已在 U 盘：资料/游戏成果/O啥的选文件/Godot_v4.7.1-stable_win64.exe.zip

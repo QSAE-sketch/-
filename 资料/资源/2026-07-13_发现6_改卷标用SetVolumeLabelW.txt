@@ -1,0 +1,6 @@
+﻿【新发现】改 U 盘卷标用 Python ctypes 直调 SetVolumeLabelW 最稳
+发现时间：2026-07-13
+
+- 想把 U 盘卷标命名为「记忆库」时：PowerShell 的 Set-Volume 在此沙箱回显异常、wmic 被禁，命令没真正执行。
+- 最稳做法：Python ctypes 直调 kernel32.SetVolumeLabelW("G:\\", "记忆库")，再用 GetVolumeInformationW 读回验证。
+- 少年用此法改名并读回验证成功，卷标「记忆库」生效。

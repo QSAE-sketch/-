@@ -1,0 +1,20 @@
+﻿# 2026-08-08 发现 · 塔防游戏（Canvas 多塔多敌）开发经验
+
+## 架构范式（可复用）
+- 单文件 HTML5 Canvas + 原生 JS，零依赖；requestAnimationFrame 主循环
+- 网格系统：CELL 常量定义格子，路径用 [[col,row],...] 坐标数组
+- 多路径地图：MAPS 数组的 paths 嵌套；spawnEnemy 用 pickRandomPath()+getPathCoords(pathId,idx) 支持多路敌人
+- 形状系统：drawEnemyShape(ctx,x,y,r,shape) 支持 circle/square/triangle/diamond/hexagon/star/cross
+- 统一伤害：applyDamage(e,dmg,tower) 集中处理护盾/分裂/死亡；buildWave 用 WAVE_POOLS 数组控每波敌人类型
+
+## 防御性编程教训（重要）
+- TOWER_DEFS 的「键名」必须和对象内的 type 字段完全一致，否则 selectTower->创建塔->取 def.type 全部对不上，整塔点击即崩溃。项目曾因 holly/holy、reviive/revive 两处拼写错废掉两塔。
+- 召唤/分裂生成敌人时，引用字段必须存在于 ENEMY_DEFS（如 maxHp），否则伤害变 NaN。
+
+## 侧边栏大量控件防溢出（本次核心新发现）
+- 当侧边栏同时有 17 个塔按钮 + 12 张地图 + 24 条敌人图鉴时，固定高度盒子会被挤出视口。
+- 解法组合：① 塔按钮 padding/font 紧凑（36->28px）② 地图按钮改 CSS grid 2列（12行->6行）③ 敌人图鉴 max-height 用 vh（33vh）而非固定 px，随屏高自适应 ④ 信息面板 flex:1->flex:0 0 auto 不再拉伸抢占空间。
+- 列表类内容优先用 vh 单位 + overflow-y:auto，避免内容被固定 px 截断。
+
+## Boss 多级机制模板
+- boss_ultra（混沌魔王）：回血%/秒 + 护盾再生%/秒 + 定时召唤小怪 + 周期无敌盾 + 伤害反弹（扣金币）+ 死亡分裂。可作为其他 Boss 的复用骨架。

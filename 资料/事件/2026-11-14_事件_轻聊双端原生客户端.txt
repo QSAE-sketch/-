@@ -1,0 +1,61 @@
+2026-11-14　事件：轻聊双端改为真·原生客户端（2.0.0 / code 13）
+
+一、起因
+大佬明确要求：「现在要做的是原生的版本，不是只做一个壳」。
+此前 Windows 端是 44KB 的浏览器启动壳（调 Edge/Chrome 的 --app 开线上站点），
+安卓端是 98KB 的 WebView 壳（加载线上网页）。两者本质都是网页的容器。
+
+二、结论与做法
+两端全部重写为原生实现，不再加载任何网页：
+
+1) Windows 端（native-win/，C++ Win32 + GDI）
+   - 自己写 JSON 解析器（header-only）、WinHTTP 封装（HTTPS/Cookie/二进制）、业务 API 层
+   - 界面全部 GDI 双缓冲自绘：登录卡片、房间侧栏、聊天气泡、输入区、设置窗
+   - 单文件 exe 584KB，静态链接，不依赖 Node/浏览器/运行库
+   - 后台线程跑网络 + PostMessage 回主线程，界面不卡请求
+
+2) 安卓端（android/，Java + 原生控件）
+   - 删掉全部 WebView 相关类（AppBridge/AppChrome*/AppWebViewClient*/WebKit）
+   - Api.java（HttpURLConnection + org.json）、Store.java（多账号存储）
+   - LoginActivity（选账号/表单）、MainActivity（ListView 聊天）、MsgAdapter（三种行类型）
+   - APK 120KB，minSdk 19（红米 Note 2 可装）
+
+3) 登录体验对齐 QQ
+   - 记住密码：Windows 用 DPAPI 加密存 %LOCALAPPDATA%\QingLiao\cred.dat；
+     安卓存应用私有目录 + 混淆。下次打开隐藏密码框，点一下就登录
+   - 自动登录：勾选后直接进聊天界面
+   - 多账号：头像横排、蓝色带勾选中、灰色未选；「＋」添加、长按/账号管理移除
+   - 只有输入过密码并登录成功过的账号才会出现在头像行
+
+三、踩过的坑（重要）
+- 线上地址在分享网关后面：直接 POST /api/login 返回 403。
+  必须先 GET /?sharecode=T7ELJZOC5A 拿到会话 Cookie 再调 API。
+  Windows 端手动维护 Cookie 头，安卓端用系统 CookieManager。
+- Win32：WM_PAINT 里必须 BeginPaint/EndPaint，否则更新区域永不失效 →
+  WM_PAINT 无限重投，定时器和网络回调全被饿死（表现为窗口卡死、进程不退）。
+- Win32：CreateWindowExW 期间派发的 WM_CREATE 里必须先保存 hwnd，
+  否则自动登录的结果 PostMessage 到空句柄，界面停在「加载中」。
+- Win32：EDIT 的 EM_SETCUEBANNER 需要 comctl32 v6 清单才生效；
+  之前误把 .ico 写成 `1 24` 资源导致「并行配置不正确」。
+- GDI 气泡：MsgLayout.bubble 是相对内容坐标，绘制时只能加 baseY，
+  不能再加已含行偏移的 top，否则消息越往下偏移越大（表现为间距爆炸）。
+- 自绘输入框要「底框 + 无边框 EDIT」组合：EDIT 用 WS_EX_CLIENTEDGE 在白卡片上几乎看不见，
+  用 WM_CTLCOLOREDIT 把背景刷成与底框同色才像一体。
+
+四、验证
+- native-win/selftest.exe：端到端 18 项全过（注册→登录→房间→发消息→拉消息→分块上传→
+  发文件消息→改昵称→会话恢复→清理），跑在本地服务器 3311。
+- Windows 界面：用 --shot 参数自动截图逐屏核对（登录表单 / 账号选择器 / 双账号 / 聊天）
+- 安卓：gradle assembleRelease 成功；在 Android 5.1 模拟器（ql21）安装启动，
+  登录页渲染正确、无崩溃（模拟器老镜像自身 Search 组件崩溃，未继续跑完整流程）
+
+五、产物
+- chatapp/轻聊.exe（584,192 字节）
+- chatapp/轻聊.apk（120,294 字节，2.0.0 / 13）
+- 已同步到 资料/游戏成果/轻聊/ 与 资料/源码/轻聊/
+
+六、遗留
+- 原生端图片/视频只显示文件卡片，无缩略图
+- 群管理（转让/解散/禁言/踢人）仍只有网页版完整入口
+- 网页版 1.8.0 的三档兼容保持不变，未重新部署（version.json 已升到 2.0.0，
+  下次部署站点时线上版本号会同步）

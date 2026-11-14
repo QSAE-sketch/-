@@ -1,0 +1,23 @@
+【2026-11-14 发现】发布工具只支持「一个工作区一个应用槽」，部署第二个应用会覆盖第一个
+
+■ 现象
+对 `netdisk/` 目录调用发布（workbuddy_sites_deploy，directory 指向 netdisk）后，
+返回的 shareLink 仍然是 `qingliao-chat-33476.app.workbuddy.host`，genieFilePath 也是原来那个
+`.wbapp_uYiIp668K7SSIukHhaRkrR.genie`。
+线上 `/api/health` 立刻变成网盘的接口，`/api/version` 变 404 —— 也就是**聊天站被整个替换掉了**。
+
+■ 结论（重要）
+- 应用身份不是按「项目目录」判定的，而是按**工作区**（workspace + 那个 .wbapp_*.genie 标记）判定。
+  工作区里已经有发布记录时，再部署任何目录都会**覆盖同一个应用的代码包**，不会新建链接。
+- 因此「同一个工作区里发布两个独立应用」目前**做不到**。
+- 恢复办法：把 `chatapp/` 重新发布一次即可（数据在云数据库里，不受影响，已实测恢复）。
+
+■ 后续怎么办
+- 想单独发布网盘：需要第二个工作区（另一个 project/session），或者平台支持一个工作区多个应用。
+- 在此之前：**永远不要部署 netdisk/**；聊天站里的 `NETDISK_URL` 保持为空，网盘入口与自动保存会自动隐藏/跳过。
+- 网盘代码本身是完整可用的（`netdisk/test/e2e.js` 55/55），拿到应用位后直接部署 + 把
+  `NETDISK_URL` 指过去即可，两边代码不用改。
+
+■ 顺带记住
+- 每次「换了一个目录去发布」之前，先确认返回的 shareLink 是不是预期的那一个；
+  如果 shareLink 没变，说明是覆盖而不是新建。

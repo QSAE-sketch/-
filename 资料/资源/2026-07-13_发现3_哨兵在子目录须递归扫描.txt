@@ -1,0 +1,7 @@
+﻿【新发现】哨兵/知识库在子目录，扫描必须递归（不能只查盘根）
+发现时间：2026-07-13
+
+- 大佬把 workbuddy-kb 与哨兵一起挪进了 U 盘的"验证"子目录（如 G:/验证/__WORKBUDDY_KB_ID__）。
+- 哨兵实际不在盘根！只查盘根的扫描（如 [ -f "/$d/__WORKBUDDY_KB_ID__" ]）会漏掉 → 误报"扫不到盘符"。
+- 别的任务就曾因此扫不到。修复：扫描改用递归（find /$d -maxdepth 3 -name __WORKBUDDY_KB_ID__），子目录也能命中。
+- 定位 workbuddy-kb 同理：find <盘符> -maxdepth 3 -type d -name workbuddy-kb。

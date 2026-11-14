@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#1f6feb">
+<title>轻聊 · 聊天与文件传输</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="apple-mobile-web-app-title" content="轻聊">
+<script>
+/* 打开网站时的设备/浏览器能力探测。
+   老 WebView（红米 Note 2 / Android 5.x）不支持 CSS 变量，且容器可能没开 DOM Storage：
+   标准版会变成黑白缩小的静态骨架、所有按钮失效。这里一旦探测到能力不足，
+   就写 cookie 并回源让服务器改发 index-lite.html（低配兼容版）。
+   整段必须全程 try/catch —— 正是为了在 localStorage 会抛异常的设备上也能活着跳走。 */
+(function () {
+  try { if (document.documentElement.getAttribute('data-ll-cap') === 'lite') return; } catch (e) { return; }
+  var bad = false;
+  try {
+    try { localStorage.setItem('__ll_probe__', '1'); localStorage.removeItem('__ll_probe__'); }
+    catch (e1) { bad = true; }
+    try {
+      if (!(window.CSS && window.CSS.supports && window.CSS.supports('color', 'var(--x)'))) bad = true;
+    } catch (e2) { bad = true; }
+    try {
+      if (!window.JSON || !window.Promise || !Array.prototype.forEach ||
+          !Function.prototype.bind || !document.querySelector) bad = true;
+    } catch (e3) { bad = true; }
+  } catch (e4) { bad = true; }
+  if (!bad) return;
+  try { document.cookie = 'll_cap=lite; path=/; max-age=2592000'; } catch (e5) {}
+  try {
+    var q = String(location.search || '');
+    q = q.replace(/[?&]lite=[^&]*/g, '');
+    if (q.charAt(0) === '&') q = '?' + q.slice(1);
+    location.replace((location.pathname || '/') + q + (q ? '&' : '?') + 'lite=1');
+  } catch (e6) {}
+})();
+</script>
+<script>
+/* 首屏防闪烁：在样式表生效之前就把主题定下来。
+   否则浅色 → 深色（或反过来）会先闪一下再切换。
+   这段脚本必须与 app.js 里的判定逻辑保持一致：
+     ll_theme_mode = system | time | manual
+     ll_theme_pref = light | dark          （手动模式选的）
+     ll_theme_time = {"d":7,"n":18}        （时间模式的日间/夜间起始小时） */
+(function () {
+  var MODE = 'll_theme_mode', PREF = 'll_theme_pref', TIME = 'll_theme_time';
+  function ls(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function nativeSystem() {
+    // 原生容器（Android）在地址里带 sys=dark|light，老 WebView 不支持 prefers-color-scheme 时靠它
+    try {
+      var m = String(location.search || '').match(/[?&]sys=(dark|light)/);
+      return m ? m[1] : '';
+    } catch (e) { return ''; }
+  }
+  function pick() {
+    var mode = ls(MODE) || 'system';
+    if (mode === 'manual') return ls(PREF) === 'dark' ? 'dark' : 'light';
+    if (mode === 'time') {
+      var d = 7, n = 18;
+      try {
+        var raw = JSON.parse(ls(TIME) || '{}');
+        if (raw && typeof raw.d === 'number') d = raw.d;
+        if (raw && typeof raw.n === 'number') n = raw.n;
+      } catch (e) { }
+      var h = new Date().getHours();
+      return (h >= d && h < n) ? 'light' : 'dark';
+    }
+    var sys = nativeSystem();
+    if (sys) return sys;
+    return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  var t = pick();
+  try {
+    document.documentElement.setAttribute('data-theme', t);
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', t === 'dark' ? '#131d30' : '#1f6feb');
+  } catch (e) { }
+})();
+</script>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<!-- ============ 登录 / 注册 ============ -->
+<section id="auth" class="screen">
+  <div class="auth-box">
+    <img class="logo-img" src="/logo.png" alt="轻聊" width="72" height="72">
+    <h1 class="logo">轻聊</h1>
+    <p class="logo-sub">聊天 · 文件传输</p>
+    <div class="tabs">
+      <button class="tab active" data-auth-tab="login">登录</button>
+      <button class="tab" data-auth-tab="reg">注册</button>
+    </div>
+    <div class="modes" id="authModes">
+      <button class="mode active" data-auth-mode="password">账号密码</button>
+      <button class="mode" data-auth-mode="email">邮箱</button>
+      <button class="mode" data-auth-mode="otp">验证码</button>
+      <button class="mode" data-auth-mode="workbuddy">WorkBuddy</button>
+    </div>
+    <input id="au" class="inp" type="text" placeholder="账号（2-20位中英文数字）" autocomplete="username">
+    <input id="ap" class="inp" type="password" placeholder="密码（至少6位）" autocomplete="current-password">
+    <div class="row-code hide" id="codeRow">
+      <input id="ac" class="inp" type="text" placeholder="验证码" inputmode="numeric" autocomplete="one-time-code">
+      <button id="acode" class="btn small">获取验证码</button>
+    </div>
+    <input id="an" class="inp hide" type="text" placeholder="昵称（选填）" autocomplete="nickname">
+    <input id="ak" class="inp" type="text" placeholder="权限密钥（选填，使用后 30 分钟最高权限）" autocomplete="off">
+    <div id="aerr" class="err"></div>
+    <button id="ab" class="btn primary full">登 录</button>
+    <button id="awb" class="btn full hide">使用 WorkBuddy 账号登录</button>
+    <p class="tip" id="atip">账号唯一不可重复，密码加盐哈希存储</p>
+  </div>
+</section>
+
+<!-- ============ 主界面 ============ -->
+<section id="main" class="screen hide">
+  <header class="topbar">
+    <div class="tb-title" id="tbTitle">公共聊天室</div>
+    <div class="tb-right">
+      <span id="tbUser" class="tb-user"></span>
+      <!-- 手动切换版本；服务器会把 href 注入成保留 sharecode 等原参数的地址 -->
+      <a id="capSwitch" class="icon-btn" href="/?lite=1" title="切换到低配兼容模式"
+         style="text-decoration:none;display:flex;align-items:center;justify-content:center">⇄</a>
+      <button id="themeBtn" class="icon-btn" title="切换主题">🌙</button>
+    </div>
+  </header>
+
+  <div id="view" class="view"></div>
+
+  <nav class="tabbar">
+    <button class="tb-btn active" data-view="public"><span class="ic">💬</span><span class="lb">公共</span></button>
+    <button class="tb-btn" data-view="rooms"><span class="ic">🏠</span><span class="lb">房间</span></button>
+    <button class="tb-btn" data-view="friends"><span class="ic">👥</span><span class="lb">好友</span></button>
+    <button class="tb-btn" data-view="drive"><span class="ic">☁️</span><span class="lb">网盘</span></button>
+    <button class="tb-btn" data-view="me"><span class="ic">👤</span><span class="lb">我的</span></button>
+  </nav>
+</section>
+
+<!-- ============ 聊天页 ============ -->
+<section id="chat" class="screen hide chat-screen">
+  <header class="topbar">
+    <button id="backBtn" class="icon-btn">‹</button>
+    <div class="tb-title" id="chatTitle">房间</div>
+    <button id="joinBtn" class="icon-btn" style="display:none">加入</button>
+    <button id="memberBtn" class="icon-btn">👥</button>
+  </header>
+  <div id="msgs" class="msgs"></div>
+  <div id="upBar" class="upbar hide">
+    <div class="up-text" id="upText">上传中…</div>
+    <div class="up-track"><div class="up-fill" id="upFill"></div></div>
+    <button id="upCancel" class="mini">取消</button>
+  </div>
+  <div class="composer" id="composer">
+    <button id="fileBtn" class="icon-btn big">📎</button>
+    <input id="msgInput" class="inp grow" type="text" placeholder="说点什么…">
+    <button id="sendBtn" class="btn primary send">发送</button>
+  </div>
+  <!-- 多选模式操作栏：多选时取代输入框 -->
+  <div id="selBar" class="selbar hide">
+    <div class="sel-left">
+      <span class="sel-count" id="selCount">已选 0 条</span>
+      <button id="selAll" class="mini link">全选</button>
+    </div>
+    <button id="selDelete" class="btn ghost">删除</button>
+    <button id="selPurge" class="btn danger">直接删除</button>
+    <button id="selCancel" class="btn ghost">取消</button>
+  </div>
+  <input id="fileInput" type="file" class="hide">
+</section>
+
+<!-- ============ 设置 ============ -->
+<section id="settings" class="screen hide">
+  <header class="topbar">
+    <button id="setBackBtn" class="icon-btn">‹</button>
+    <div class="tb-title">设置</div>
+    <div class="tb-right"></div>
+  </header>
+  <div id="setView" class="view"></div>
+</section>
+
+<!-- ============ 用户资料 / 申请加好友 ============ -->
+<section id="friendAdd" class="screen hide">
+  <header class="topbar">
+    <button id="faBackBtn" class="icon-btn">‹</button>
+    <div class="tb-title" id="faTitle">用户资料</div>
+    <div class="tb-right"></div>
+  </header>
+  <div id="faView" class="view"></div>
+</section>
+
+<!-- ============ 弹层 ============ -->
+<div id="modal" class="modal hide">
+  <div class="modal-box">
+    <div class="modal-title" id="modalTitle">标题</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button id="modalCancel" class="btn ghost">取消</button>
+      <button id="modalOk" class="btn primary">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hide"></div>
+
+<!-- 消息操作面板：点任意消息/文件后从底部浮出（多选 / 撤回 / 删除 / 直接删除） -->
+<div id="actSheet" class="actsheet hide">
+  <div class="act-mask" id="actMask"></div>
+  <div class="act-box" id="actBox"></div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

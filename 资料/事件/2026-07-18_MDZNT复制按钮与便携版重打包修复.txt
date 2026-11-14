@@ -1,0 +1,19 @@
+2026-07-18 下午（约 16:0x）MDZNT 桌面版：复制按钮 + 便携版重打包修复
+
+1. 用户问"可以复制粘贴吗？不可以的话还是挺麻烦的。"
+   - 确认：粘贴本来就能用（输入框是 <textarea>，WebView2 里直接 Ctrl+V 粘贴文字，也支持把文件拖进去）。
+   - 复制 AI 回复：之前只能手动选中文字再 Ctrl+C，没有一键按钮，用户嫌麻烦。
+   - 处理：在 index.html 的 renderRich()（所有最终 bot 消息都经此渲染，覆盖历史 + 流式完成）里给每条 AI 回复加「复制」按钮（hover 显隐，不破坏界面整洁）；优先 navigator.clipboard.writeText，失败回退 textarea+execCommand('copy')。
+
+2. 反查发现之前便携版 onedir（14:35 打的那次）是旧源码打的——内部 .pyc 不含 auto_select 折中键，且 version_tag 状态存疑，不能直接交付。
+   - 修复：切 version_tag=True 重打便携版，复查封 auto_select 补齐；同时把刚加的「复制」按钮一起打进两版。
+   - 自用版（15:42）已确认是最新代码 + False，正确无需重打，但为带上复制按钮也一并重打。
+
+3. 环境里 PyInstaller 被清掉了（之前能打包，这次报错 No module named PyInstaller）。
+   - 按隔离规则装回 managed venv：envs/default/Scripts/pip install pyinstaller（6.21.0）；打包用 envs/default/Scripts/python.exe -m PyInstaller。
+
+4. 校验：抽取 index.html 的 <script> 用 new Function() 做语法检查 ALL_OK；_verify_v2.py 15/15 全过（便携版 is_portable=True/auto_select=False/enforce_credit=True/show_api_key_ui=True；自用版 auto_select=True；填 key 即时生效并写回 config）。
+
+5. 交付：便携版已复制到 MDZNT便携版/（覆盖 exe+_internal，保留 portable-models/一键启动.cmd/使用说明.txt）；自用版在 dist/MDZNT/；version_tag 复位 False。
+
+6. 同步进 U盘记忆库：资源 md 补本节、本事件记录、游戏成果换最新两版 onedir。

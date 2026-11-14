@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-ll-cap="lite">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6feb">
+<title>轻聊 · 低配兼容版</title>
+<link rel="stylesheet" href="/style-lite.css">
+<script>
+/* ============================================================
+ * 低配版守门（内联，必须早于 app-lite.js）
+ *
+ * 作用：如果本页的脚本在这个内核上仍然跑不起来（顶层异常、语法不被
+ * 识别、绑定中断……），就自动降到「基础版」。对用户来说只是刷新了一下，
+ * 而不是面对一个按钮点不动的死页面。
+ *
+ * 判定标准是「初始化是否完成」而不是「网络是否返回」：
+ * app-lite.js 在 bindStatic() 之后立刻置 ready，所以网络慢不会被误降级。
+ * ============================================================ */
+window.__LL_LITE = { err: [], ready: 0, t0: (new Date()).getTime() };
+(function () {
+  window.onerror = function (m, s, l) {
+    try {
+      if (window.__LL_LITE.err.length < 20) {
+        window.__LL_LITE.err.push(String(m) + ' @L' + l);
+      }
+    } catch (e) { }
+    return false;
+  };
+  var tries = 0;
+  function fallback() {
+    try {
+      if (window.__LL_LITE.ready) return;         /* 已就绪，取消降级 */
+      tries++;
+      if (tries < 3) { setTimeout(fallback, 1000); return; }
+      if (window.__LL_LITE.ready) return;
+      var u = String(location.href);
+      if (u.indexOf('lite=2') >= 0) return;        /* 已经在 basic，防止死循环 */
+      u = u.replace(/([?&])lite=\d+/g, '$1');
+      u = u.replace(/[?&]$/, '');
+      u += (u.indexOf('?') >= 0 ? '&' : '?') + 'lite=2';
+      location.replace(u);
+    } catch (e2) { }
+  }
+  setTimeout(fallback, 1100);
+})();
+</script>
+</head>
+<body>
+
+<!-- ============ 登录 / 注册 ============ -->
+<div id="auth">
+  <div class="bar"><span class="title">轻聊</span><span class="right tip">低配兼容版</span></div>
+  <div class="box">
+    <div style="text-align:center;font-size:20px;font-weight:bold">轻聊</div>
+    <div style="text-align:center" class="tip">聊天 · 文件传输</div>
+    <div style="margin-top:12px">
+      <div id="authTabLogin" class="tab on">登录</div>
+      <div id="authTabReg" class="tab">注册</div>
+    </div>
+    <div class="modes">
+      <div id="modePassword" class="mode on">账号密码</div>
+      <div id="modeEmail" class="mode">邮箱验证码</div>
+      <div id="modeOtp" class="mode">短信验证码</div>
+      <div id="modeWb" class="mode">WorkBuddy</div>
+    </div>
+    <div id="rowUser"><input id="au" class="inp" type="text" placeholder="账号（2-20 位中英文数字）" autocomplete="off"></div>
+    <div id="rowPass"><input id="ap" class="inp" type="password" placeholder="密码（至少 6 位）" autocomplete="off"></div>
+    <div id="rowTarget" class="hide"><input id="at" class="inp" type="text" placeholder="邮箱或手机号" autocomplete="off"></div>
+    <div id="rowCode" class="hide">
+      <input id="ac" class="inp" type="text" placeholder="验证码" autocomplete="off" style="width:58%;display:inline-block">
+      <span id="acode" class="mini" style="height:40px;line-height:28px;vertical-align:top">获取验证码</span>
+    </div>
+    <div id="rowNick" class="hide"><input id="an" class="inp" type="text" placeholder="昵称（选填）" autocomplete="off"></div>
+    <div id="rowPerm"><input id="ak" class="inp" type="text" placeholder="权限密钥（选填，30 分钟最高权限）" autocomplete="off"></div>
+    <div id="aerr" class="err"></div>
+    <button id="ab" class="btn primary full">登 录</button>
+    <button id="awb" class="btn full hide">使用 WorkBuddy 账号登录</button>
+    <p class="tip">账号唯一不可重复；低配版与标准版共用同一套数据</p>
+  </div>
+</div>
+
+<!-- ============ 主界面 ============ -->
+<div id="main" class="hide">
+  <div class="bar">
+    <span class="title" id="tbTitle">公共聊天室</span>
+    <span class="right"><span id="tbUser" class="tip"></span> <span id="themeBtn" class="mini">主题</span></span>
+  </div>
+  <div id="view" class="wrap"></div>
+  <div class="tabs">
+    <div class="tb on" id="navPublic">公共</div>
+    <div class="tb" id="navRooms">房间</div>
+    <div class="tb" id="navFriends">好友</div>
+    <div class="tb" id="navDrive">网盘</div>
+    <div class="tb" id="navMe">我的</div>
+  </div>
+</div>
+
+<!-- ============ 聊天页 ============ -->
+<div id="chat" class="hide">
+  <div class="bar">
+    <span class="left"><span id="backBtn" class="mini">返回</span></span>
+    <span class="title" id="chatTitle">房间</span>
+    <span class="right"><span id="joinBtn" class="mini hide">加入</span> <span id="memberBtn" class="mini">成员</span></span>
+  </div>
+  <div id="upBar" class="upbar hide">文件上传中…</div>
+  <div id="msgs"></div>
+  <div id="composer" class="composer">
+    <input id="fileInput" type="file" class="mini" style="width:74px;height:40px;vertical-align:top">
+    <input id="msgInput" class="inp" type="text" placeholder="说点什么…">
+    <button id="sendBtn" class="btn primary">发送</button>
+  </div>
+</div>
+
+<!-- ============ 弹层 / 提示 ============ -->
+<div id="modal" class="modal hide">
+  <div class="modal-box">
+    <div id="modalTitle" class="modal-title">标题</div>
+    <div id="modalBody" class="modal-body"></div>
+    <div class="modal-foot">
+      <button id="modalCancel" class="btn ghost">取消</button>
+      <button id="modalOk" class="btn primary">确定</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="toast hide"></div>
+
+<div class="cap-link"><a href="/?lite=0">标准版</a> · <a href="/?lite=2">基础版</a> · 低配兼容版</div>
+
+<script src="/app-lite.js"></script>
+</body>
+</html>

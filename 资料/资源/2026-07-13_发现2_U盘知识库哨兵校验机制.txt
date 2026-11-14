@@ -1,0 +1,11 @@
+﻿【新发现】把 U 盘当"随时可调用"知识库 + 哨兵身份校验机制
+发现时间：2026-07-13
+
+- U 盘插上后是本地盘符，少年的文件工具可直接读写，比云端稳（不依赖服务器/授权）。
+- 身份校验：U 盘内放哨兵文件 __WORKBUDDY_KB_ID__，内容含唯一 UUID（0a89e2a3-ade1-4f58-ac7d-1edba7e8f167）。
+- 少年"搜不到 / 可能没记住"时，扫描所有盘符找该文件名：
+    命中 → U盘在位，读 workbuddy-kb/（index.md + topics/）补充记忆；
+    未命中 → 提醒大佬插 U 盘。
+- 靠 UUID 识别，不靠盘符（盘符会变，UUID 不变），换口插都认得。
+- 知识库结构：workbuddy-kb/ 下含 identity.json、README.md、index.md、topics/、inbox/、index/。
+- U 盘卷标已命名为「记忆库」。

@@ -1,0 +1,53 @@
+# 2026-11-13 事件：轻聊修复老设备兼容性（双版本分发）+ 房间功能三项
+
+## 背景
+大佬反馈：红米 Note 2 等低能力设备上，页面已加载完成、并非卡死，却呈现**黑白且被缩小的静态界面**，
+除「上传文件」外所有按钮都点不动，上传 / 发消息 / 登录实际全部不可用。
+同时要求给群/房间加三个功能：转让后的房间内系统通知、群专属昵称、解散群聊。
+
+## 根因（这次最有价值的发现）
+`app.js` 其实**已经是纯 ES5**，语法不是问题。真正两处：
+1. `style.css` 有 **139 处 `var(--)` + 28 处 flex + vh/calc**。Android 5.x WebView（Chromium 37/39）
+   不支持 CSS 自定义属性 → 颜色声明被整体丢弃 = 黑白；flex 塌陷 = 界面被缩成静态骨架。
+2. `app.js` 顶层 `var S = { token: [已隐去].getItem('ll_token') || '' ... }` **没有 try/catch**。
+   老容器没开 DOM Storage 时这一行抛 SecurityError → 整个 IIFE 中断 → 所有 onclick 都没绑上。
+   只有原生 `<input type=file>` 还能弹选择器，正好对上「除上传外全点不动」。
+`test/lite-boot.js` 用 vm 做了对照实验：同样环境下标准版确实中断且按钮无 onclick，低配版 12 项全过。
+
+## 方案（按大佬指定：服务器按能力分发，两版共用同一套数据）
+- 新增 `public/index-lite.html` + `app-lite.js` + `style-lite.css`：纯 ES5、实色 CSS、
+  零 CSS 变量/flex/vh/calc/rem、XHR + 回调、localStorage 全 try/catch 并用 cookie 兜底 token、
+  中文请求体手写 UTF-8 字节、分片上传用 FileReader+ArrayBuffer 并兼容 webkitSlice。
+- `server.js` 新增 `capabilityLevel()`：优先级 URL `?lite=1|0` > 客户端探测 cookie `ll_cap`
+  > `X-LL-Cap` 头 > Save-Data / Device-Memory≤1 > UA 兜底（Android≤5、Chrome<49、;wv、IE、UC、老 MIUI）。
+  入口只分发 HTML，静态资源按版本注入 `?v=` 指纹；版本切换链接自动保留 sharecode。
+- 标准版 `index.html` 顶部加**纯 ES5 全 try/catch 的能力探测引导**：检测 CSS.supports('color','var(--x)')、
+  DOM Storage、Promise/querySelector 等，能力不足就写 cookie 并回源让服务器改发低配版。
+- 两版调**同一批 `/api/*`**，账号/群/消息/文件/昵称/转让/解散/通知天然互通（线上冒烟已实测）。
+
+## 房间功能三项
+- **群/房间专属昵称**：存在 `members.roomNickname`，只改当前 roomId 那一条，不碰 `users.nickname`；
+  `POST /api/rooms/:id/nickname`，空串=清除并回退全局昵称；成员列表下发 `roomNickname/displayName/myRoomNickname`，
+  消息 `senderName` 按房间取，其它房间与全局显示不受影响。
+- **转让系统通知**：`postSystem()` 只往对应房间写 `kind:'system'` 消息（senderId 固定 'system'，不可撤回/彻底删除）。
+  · 设固定继承人 →「{原群主群内昵称}的群主权限已转让至固定继承人」
+  · 没设继承人 →「已继位给最早加入的{继位者群内昵称}」
+  · 主动转让（新增 `POST /api/rooms/:id/transfer`）→「{原群主群内昵称}的群主权限已转让至{新群主群内昵称}」
+  文案里的「某某」全部取**该房间专属昵称**，不是全局昵称。顺手修了注销继承时没同步 `room.ownerId` 的旧 bug。
+- **解散群聊**：`POST /api/rooms/:id/dissolve`，仅群主 + `confirm:true` 二次确认（前端还加输房间名）。
+  停用而非物理删除：房间变只读存档，保留成员与历史，写入一条解散系统通知；
+  主请求处理里统一拦截所有针对已解散房间的写操作（410），GET 历史/成员/通知仍放行。
+  注：注销账号时「无人继承→解散删除」沿用大佬上次的物理删除语义，未改动，避免回归。
+
+## 验证
+- 新增 `test/room-features.js`（68 项）、`test/lite-boot.js`（12 项），`tools/run-suite.js` 收编。
+- 因构建指纹现在纳入 lite 文件，同步更新 `test/version.js` 的本地复算；标准版成员面板对精简 DOM 加
+  `insertBefore` 降级判断，修好 `test/ui.js` 回归。
+- 全量回归：**本地 509/0、云端 512/0**；线上冒烟 **18/18**（老 UA 分发、两版互通、转让通知、解散停用，测试账号自动注销清理）。
+- 已重发布：https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A
+
+## 遗留 / 约定
+- 低配版为「核心功能完整可用」优先级，视觉做了减法（无深浅主题变量、无复杂动画）；
+  好友/私聊做了基础入口，四种登录方式均可用。
+- 真机（红米 Note 2）6 项体验项仍需大佬在设备上确认；自动化只能证明脚本不崩、按钮有事件、API 通。
+- 本次产物（APK/exe）未变，按规则「改动后的同步范围」不重复同步 游戏成果/ 与 素材库/。

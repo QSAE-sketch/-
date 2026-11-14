@@ -1,0 +1,46 @@
+2026-07-18 事件：MDZNT 积分教程 + onedir 重打包 + 便携硬锁加固
+
+【背景】
+- 前几轮已完成：桌面版积分系统、双版本 onefile 打包、网页版任务册、网页版重连 bug 修复（global credits）。
+- 本轮用户要求：再检查两遍 → 解决自用版/便捷版"重连" → 确认便捷版只能用一个模型 → 确认三版积分判定 → 确认字数统计不影响速度 → 在教程里补积分说明 → 保存到记忆库。
+
+【本轮实际做的工作】
+1. 两遍无头检查（_verify_pass1.py，17 项断言全过）
+   - 积分边界（桌面 CreditSystem：≤100字=1、>500封顶10、剩1点放行最后一条、跨周重置）
+   - 便携版模型：云端只暴露免费 glm-4-flash（26→1），自动选模型不切走
+   - 字数统计：100万次 len() 仅 213–332ms，O(1)，不影响 AI 速度
+
+2. 便携版硬锁加固（API 层）
+   - 旧：仅前端软锁（ZHP_MODEL_MAP），set_model 不校验，付费云端可强切
+   - 新：set_model 对便携版任何付费智谱 id 强制收敛回 glm-4-flash
+   - 验证：set_model('zhipu:glm-4.7') 实测仍 glm-4-flash
+
+3. 积分教程（写进 EXE，需重打包）
+   - 桌面版内置 guide 新增「💎 积分是什么」页（本地不扣/云端扣、公式、每周一重置1000、点头像看剩余、便携用完切本地、免费也占额度）
+   - 便携版使用说明.txt 补「💎 积分说明」节
+   - 网页版无设置/无教程，不写
+
+4. 治"重连"根因 = onefile 启动慢
+   - 旧 onefile 每次自解压+Defender 扫描 → 前端误触发重连兜底
+   - 改 onedir（文件常驻、启动快），前端连接宽限 6s→15s
+
+5. 发现并修复 spec 关键坑
+   - 便携版 spec 的 COLLECT name 误写 'MDZNT'（与自用版同名）→ 两版输出挤进 dist/MDZNT 互相覆盖
+   - 改 'MDZNT_portable' → 两版分目录（dist/MDZNT、dist/MDZNT_portable）
+
+6. 双版本 onedir 重打包（弱机串行一次一个）
+   - 自用版 → dist/MDZNT/（14:36）
+   - 便携版 → dist/MDZNT_portable/（14:35）
+   - 复制到「可执行文件/」「MDZNT便携版/」（保留各自配置文件）
+   - version_tag 复位 False
+
+7. Pass2 复跑：17/17 全过
+
+8. OpenClaw 澄清
+   - 用户本机已装好 OpenClaw，与 MDZNT 共用同一模型（本地 Ollama）
+   - 不需接入 MDZNT，未改代码
+
+【保存到记忆库】
+- 资源/2026-07-18_MDZNT积分系统与双版本构建机制.md：补硬锁、onedir、spec坑、积分教程、三版差异、OpenClaw
+- 事件/（本文件）
+- 游戏成果/：换最新 onedir 双版本（文件夹形式，含 _internal）；旧的 onefile 单 exe 保留未删

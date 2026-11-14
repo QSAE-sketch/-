@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>陨石闪避 · Meteor Dodge</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b0e1a;overflow:hidden;font-family:"Segoe UI",system-ui,sans-serif;}
+  #wrap{position:relative;width:100%;height:100%;display:flex;align-items:center;justify-content:center;}
+  canvas{background:#0b0e1a;display:block;box-shadow:0 0 40px rgba(80,140,255,.25);border-radius:10px;}
+  #hud{position:absolute;top:10px;left:0;right:0;text-align:center;color:#cdd6ff;font-size:14px;letter-spacing:1px;pointer-events:none;text-shadow:0 1px 4px #000;}
+  #hud b{color:#7fd1ff;}
+  #overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    color:#e8eeff;background:rgba(8,10,22,.82);text-align:center;gap:14px;cursor:pointer;}
+  #overlay h1{margin:0;font-size:30px;letter-spacing:2px;}
+  #overlay p{margin:0;font-size:15px;color:#9fb0e8;line-height:1.7;}
+  #overlay .key{display:inline-block;padding:2px 9px;margin:0 2px;border:1px solid #4a5fa0;border-radius:6px;color:#bcd0ff;font-size:13px;}
+  .hidden{display:none!important;}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="720" height="600"></canvas>
+  <div id="hud">⏱ <b id="time">0.0</b>s &nbsp;|&nbsp; 🏆 最佳 <b id="best">0.0</b>s &nbsp;|&nbsp; 用 <span class="key">←</span><span class="key">→</span> 或 <span class="key">A</span><span class="key">D</span> 躲，<span class="key">空格</span>重开</div>
+  <div id="overlay">
+    <h1>☄️ 陨石闪避</h1>
+    <p>你是深空里一颗蓝色能量核。<br>陨石从四面砸来，撑得越久分越高。<br>
+    <span class="key">←</span><span class="key">→</span> / <span class="key">A</span><span class="key">D</span> 移动 &nbsp;·&nbsp; <span class="key">空格</span> 开始 / 重开<br>
+    撞上任何一块石头，旅程终结。</p>
+    <p style="color:#7fd1ff;">点击此处 或 按 空格 开始</p>
+  </div>
+</div>
+<script>
+(function(){
+  const cv=document.getElementById('game'), ctx=cv.getContext('2d');
+  const W=cv.width, H=cv.height;
+  const timeEl=document.getElementById('time'), bestEl=document.getElementById('best');
+  const overlay=document.getElementById('overlay');
+  let best=+(localStorage.getItem('md_best')||0); bestEl.textContent=best.toFixed(1);
+
+  const player={x:W/2,y:H-60,r:14,sp:4.2,alive:true};
+  let rocks=[], t=0, running=false, last=0, spawn=0;
+
+  function reset(){
+    player.x=W/2; player.y=H-60; player.alive=true;
+    rocks=[]; t=0; spawn=0; running=true; overlay.classList.add('hidden'); last=performance.now();
+    requestAnimationFrame(loop);
+  }
+  function spawnRock(){
+    const edge=Math.floor(Math.random()*4);
+    let x,y,vx,vy,sp=1.6+Math.random()*1.8+t*0.02;
+    if(edge===0){x=Math.random()*W;y=-20;vx=(Math.random()-.5)*1.2;vy=sp;}
+    else if(edge===1){x=W+20;y=Math.random()*H;vx=-sp;vy=(Math.random()-.5)*1.2}
+    else if(edge===2){x=Math.random()*W;y=H+20;vx=(Math.random()-.5)*1.2;vy=-sp}
+    else{x=-20;y=Math.random()*H;vx=sp;vy=(Math.random()-.5)*1.2}
+    const r=10+Math.random()*16;
+    rocks.push({x,y,vx,vy,r,c:`hsl(${Math.floor(Math.random()*40+10)},85%,60%)`});
+  }
+  const keys={};
+  addEventListener('keydown',e=>{
+    if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))e.preventDefault();
+    keys[e.key]=true;
+    if(e.key===' '){ if(!running) reset(); }
+  });
+  addEventListener('keyup',e=>{keys[e.key]=false;});
+  overlay.addEventListener('click',()=>{ if(!running) reset(); });
+
+  function loop(now){
+    const dt=Math.min(40,now-last)/16.67; last=now;
+    if(!running) return;
+    t+=dt/60;
+    // move
+    if(keys['ArrowLeft']||keys['a']||keys['A'])player.x-=player.sp*dt;
+    if(keys['ArrowRight']||keys['d']||keys['D'])player.x+=player.sp*dt;
+    player.x=Math.max(player.r,Math.min(W-player.r,player.x));
+    // spawn
+    spawn+=dt; const interval=Math.max(8,26-t*1.4);
+    if(spawn>=interval){spawn=0; spawnRock(); if(t>15&&Math.random()<.5)spawnRock();}
+    // update rocks
+    for(const r of rocks){r.x+=r.vx*dt; r.y+=r.vy*dt;}
+    rocks=rocks.filter(r=>r.x>-40&&r.x<W+40&&r.y>-40&&r.y<H+40);
+    // collide
+    for(const r of rocks){
+      const dx=r.x-player.x,dy=r.y-player.y;
+      if(dx*dx+dy*dy<(r.r+player.r)*(r.r+player.r)){ die(); break; }
+    }
+    timeEl.textContent=t.toFixed(1);
+    draw();
+    requestAnimationFrame(loop);
+  }
+  function die(){
+    running=false; player.alive=false;
+    if(t>best){best=t; localStorage.setItem('md_best',best.toFixed(1)); bestEl.textContent=best.toFixed(1);}
+    overlay.querySelector('h1').textContent='💥 旅程终结';
+    overlay.querySelector('p').innerHTML=`你撑了 <b style="color:#7fd1ff">${t.toFixed(1)}</b> 秒。<br>按 <span class="key">空格</span> 或点击再来一次。`;
+    overlay.querySelector('p').nextElementSibling.style.display='none';
+    overlay.classList.remove('hidden');
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    // bg stars
+    ctx.fillStyle='#11162b'; ctx.fillRect(0,0,W,H);
+    // player
+    ctx.save();
+    ctx.shadowColor='#4ba8ff'; ctx.shadowBlur=18;
+    ctx.fillStyle=player.alive?'#5bc8ff':'#446';
+    ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,7); ctx.fill();
+    ctx.restore();
+    // rocks
+    for(const r of rocks){
+      ctx.save(); ctx.fillStyle=r.c; ctx.shadowColor=r.c; ctx.shadowBlur=10;
+      ctx.beginPath(); ctx.arc(r.x,r.y,r.r,0,7); ctx.fill(); ctx.restore();
+    }
+  }
+  draw();
+})();
+</script>
+</body>
+</html>

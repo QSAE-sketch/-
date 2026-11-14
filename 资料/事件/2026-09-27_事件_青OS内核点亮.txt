@@ -1,0 +1,21 @@
+# 2026-09-27 事件：青OS 真·可引导内核点亮
+
+## 任务
+大佬要求：从零写一个系统内核，放进 VirtualBox 启动（不是网站不是 Windows 应用）。
+黑底白字、全中文、终端式交互（输命令/编号打开文件和应用），做完确认无 bug 后整一个教写系统的 skill。
+
+## 产出（D:\OS系统\qingos-kernel\）
+- 青OS v1.0 完整内核：NASM 引导扇区(512B) + 32位 C 内核(~30KB)
+- 实测全通过：640x480x32 帧缓冲、344 个宋体点阵汉字、PS/2 键盘、
+  ls/cd/read/calc/time/about/back/cls 全部正常、ACPI 关机真实断电虚拟机
+- 产物: build\qingos.img / qingos.vdi / 使用说明.txt
+- Skill: ~/.workbuddy/skills/write-os-kernel/SKILL.md（备份到本盘 机器1本地备份/）
+
+## 过程要点（详见资源 2026-09-27_发现）
+1. 环境从零搭：pacman 装 nasm+clang+lld（清华镜像，llvm 包会卡死要 taskkill+清 db.lck）
+2. 引导扇区三大 bug：DAP 的 LBA 必须 8 字节、LBA 前进量与段增量不能混用、VBE 要扫模式表不能写死 0x4112
+3. 内核两大 bug：strchr(s,0) 返回 NULL、freestanding 无 size_t/64位除法
+4. 测试闭环：VBoxManage 无头开机 + screenshotpng 截图 + keyboardputscancode 打字，每轮 30 秒
+
+## 状态
+✅ 完成。测试 VM "QingOS-Test" 已关机，虚拟机配置保留在 vbox\ 目录。

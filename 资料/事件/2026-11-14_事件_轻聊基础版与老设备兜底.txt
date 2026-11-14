@@ -1,0 +1,84 @@
+【2026-11-14】轻聊 v1.8.0：新增第三档「基础版」，专治红米 Note 2 类老设备
+
+## 背景
+上一版做了「服务器按能力分发双版本（standard / lite）」，用户可以自动切换，
+但实测反馈：**低配版切过去了，红米上仍然用不了**。
+说明还有残留的兼容性坑，不是"分发没生效"。
+
+## 两个新定位到的根因（低配版仍踩到的）
+1. **position: fixed** —— 低配版的导航栏、输入框、弹层遮罩全是 fixed。
+   Android 5.x 的 WebView 对 fixed 有已知重绘 bug：滚动后固定层会错位或留残影，
+   表现就是"看着在那儿，但点不到"。这与"按钮不可点"高度吻合。
+2. **FileReader + Blob 切片上传** —— 低配版上传走 readAsArrayBuffer + 逐片 PUT。
+   老内核上 FileReader 对本地文件读取常失败（尤其权限/URI 授权问题），
+   上传链路第一步就断。
+
+（此前已定位的两个：style.css 的 139 处 CSS 变量 + flex → 黑白缩小；
+ app.js 顶层 localStorage 无 try/catch → 初始化中断 → 按钮全无 onclick。）
+
+## 方案：第三档 basic
+判定：Android ≤ 5 且 Chrome < 45 → basic；Android ≤ 4 → basic；Chrome < 40 → basic。
+URL 显式 ?lite=2 强制；cookie / X-LL-Cap 支持 basic。
+
+basic 版铁律（比 lite 更狠）：
+- 零 position:fixed / sticky（整页走文档流，导航放顶部不进 fixed 层）
+- 零 flex / grid / CSS 变量 / 圆角 / 阴影 / transition / animation / calc / vh / rem
+- 布局等分一律用 table 单元格（永不溢出）
+- 上传改为**整文件一次 xhr.send(File)**，不用 FileReader/Blob 切片（限 4MB，超出提示换版本）
+- 不依赖 localStorage：token 走 localStorage + cookie 双写，谁可用用谁
+- 不设 xhr.timeout（老内核上赋值可能抛异常），改用 setTimeout 手动超时
+- 不用 forEach/map/filter/trim/Date.now，全部手写循环
+- 交互用内联 onclick + window.confirm/prompt，不做自定义弹层
+- 每个 boot 步骤单独 try/catch（这是"按钮点不动"的直接防线）
+
+功能不阉割：登录注册（含权限密钥）、房间列表、进出房间、消息收发与轮询、
+文件上传下载、全局昵称、群内昵称、成员管理、设继承人、转让、解散、系统通知、
+云网盘（列表/搜索/下载/删除/回收站）、配额、注销账号。与另两版共用同一套 /api/*。
+
+## 三个在真机验证时抓出来的真 bug（都不是猜的）
+1. **go() / openRoom() 裸调用** —— 这两个只挂在 LL 上，内部却按裸函数名调用，
+   抛 ReferenceError 被 try/catch 吞掉 → 页面永远停在"正在加载"。
+   截图对比才看出来（用户名已渲染，标题还停在加载态）。
+2. **showLoading 时序** —— 它排在发请求之后，会把已经渲染好的界面又盖回
+   "正在加载…"，真实浏览器上表现为一次没必要的回跳。已移到请求之前。
+3. **调了不存在的 GET /api/rooms/:id** —— 服务端只有列表/成员/消息三个路由，
+   没有单房间详情。404 后触发 alert，把 headless 卡死（这也是排查卡了三轮的原因）。
+   改为直接从 /api/rooms 列表取房间信息，少一次请求。
+
+## 防复发：新增两条自动校验
+- **「基础版只能调真实存在的路由」**：从 server.js + src/*.js 提取路由表，
+  与代码里 api('METHOD', ...) 的字面量做 URL 段形状匹配（:id 与 * 互为通配）。
+  这条直接防住上面第 3 个 bug 那类问题。
+- **完整链路模拟**：给 vm 里的 XHR mock 加"应答器"，同步返回 /api/me、/api/rooms、
+  /messages，验证「登录态 → 主界面 → 聊天屏 → 消息渲染 → 发送」整条链不中断。
+  之前的 mock 从不回调，所以第 1 个 bug 能溜过测试。
+
+## 修好的一个"把人锁死"的问题
+用户早先在低配版点过「低配兼容模式」，cookie 会写成 ll_cap=lite。
+原来 cookie 优先级高于 UA → 红米这类跑不动低配版的设备被**永久锁死**在过去那一版，
+怎么刷新都没用。现在规则改为：**UA 明确判定为 basic 时，cookie/请求头里的 lite 一律让位**；
+只有地址栏显式 ?lite=1 才尊重用户手动选择。
+
+## 新增诊断能力（真机排查用）
+- `?diag=1`：直接展开「设备自检」面板，不用先登录。展示 XMLHttpRequest / JSON /
+  FileReader / localStorage / Cookie / CSS 变量 / flex / Grid / 视口 / 网络类型 /
+  UA / 初始化是否完成，并列出捕获到的脚本错误，支持长按复制。
+- `?debug=1`：输出执行日志（boot → token → bindStatic → me → rooms → go → openRoom → pull），
+  一眼看出卡在哪一步。
+- `?nopoll=1`：关闭轮询，弱网/省电场景可用（也用于自动化截图，否则定时器会拖住无头浏览器）。
+- 低配版加内联守门脚本：初始化未完成（约 2.7 秒）就自动降到 basic，不留死页面。
+
+## 验证
+- 本地回归 **752 / 0**；云端回归 **752 / 0**（清理 273 条测试文档）
+- 专项：lite-boot.js 33 项（含 basic 启动、完整链路、路由白名单）
+- 线上冒烟 live-smoke-basic.js **33 / 33**：三档分发、cookie 纠正、静态资源、
+  以及基础版完整业务流（注册→改昵称→发消息→单片上传→网盘→下载校验字节→回收站→注销）
+- 无头 Chrome 逐页截图核对：基础版聊天页、房间、网盘、我的、自检面板，线上登录页
+- 顺带修：test/version.js 构建指纹纳入 basic 两文件；test/perm.js 老设备断言改为 basic
+
+## 仍然存在的限制（如实记录）
+- 自动化只能证明「脚本不崩、接口通、渲染正常」，**替代不了红米真机上的手感与性能**。
+  基础版视觉做了大幅减法（无圆角、无阴影、无动画、导航在顶部且不悬浮），
+  以"先能用"为第一优先。
+- 基础版单文件上限 4MB（整文件一次发送），更大的文件会提示切到低配版/标准版。
+- 基础版的管理操作用 prompt 输入序号，交互比较原始（老设备上没有可靠的弹层方案）。

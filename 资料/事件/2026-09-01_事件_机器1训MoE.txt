@@ -1,0 +1,27 @@
+# 事件：机器1 本地训练 MoE 0.5B 专家（2026-09-01 归档）
+
+## 起因
+用户放弃安卓虚拟机（已删除 D:\AndroidVM、D:\apk-share），决定自己训练 AI。
+
+## 目标
+- MoE 架构：总参近 7B = 30 多个专家 + 1 个指挥官（router）。
+- 本次明确：**每个小专家 = 0.5B**（不是 7B）；7B 是全部专家+指挥官加起来的总参。训练资料少所以做小模型。
+
+## 环境与代码
+- 机器1：RTX 5060 8GB（Blackwell, sm_120），Windows，主机名 SK-20260324ZSZO。
+- 训练代码：`D:\moe-train\train_experts.py`（字符级共享词表 + 小 GPT + AMP；按领域逐个训，每完成存 `D:\共享\expert_<领域>\`{model.pt,config.json,vocab.json,README.txt}，并写 `D:\共享\TRAIN_MANIFEST.jsonl`）。
+- 生成测试：`D:\moe-train\generate.py`。
+- 语料：`D:\训练语料` 15 领域 ~5.1GB；先训热门 8 领域（闲聊/问答/编程/游戏/写作/历史/数学/AI），冷门暂放。
+- 共享通道：`D:\共享` 已 SMB 共享给机器2（Everyone=Full），机器2 写入即落机器1 硬盘。
+
+## 关键踩坑（详见资源文件）
+1. `download.pytorch.org` 在机器1 被墙 → 用上海交大镜像 `mirror.sjtu.edu.cn/pytorch-wheels/cu128/`（含 cp313 win_amd64 轮子）。
+2. pip 多 index 会被 PyPI 的更高版本 **cpu 版 torch** 覆盖 → 精确 pin `torch==2.11.0+cu128` + 仅 SJTU index，依赖另装。
+3. C++ 训练路线放弃：本机仅 MinGW g++，无 MSVC/nvcc（nvcc 需 MSVC），从零写训练循环工作量巨大。继续 Python + torch cu128（自带 CUDA runtime，不需 nvcc）。
+
+## 模型规模修正（重要）
+- 初版 CFG：n_embd=1280, n_head=16 → head_dim=80，**违反 SDPA 要求（head_dim 须 64/128 倍数）**，会触发慢路径 + loss 异常。
+- 已改为 n_head=20（1280/20=64），约 0.47B 参数。
+
+## 状态
+脚本语法通过、语料/共享目录就绪；torch cu128 装完即后台启动训练热门专家，训完一个存一个到 `D:\共享`。

@@ -1,0 +1,59 @@
+【2026-11-13】轻聊：最高权限体系（权限密钥）+ 公共大厅保护 + 永久账号烫金标识
+
+一、背景
+大佬要求：公共大厅默认任何人都无权解散；新增「权限密钥」，登录/注册时输入即获最高权限，
+可删除任意内容、解散公共大厅、注销指定用户；密钥**使用后**开启 30 分钟有效期（不是只能持有 30 分钟）；
+账号名与昵称均为「刘子墨」的账号获永久最高权限，其每条消息的名字显示金色烫金边框 + 精致头像框，
+且该视觉**仅标准版生效，低配版不展示**。
+
+二、根因/关键判断
+- 原 /api/rooms/:id/dissolve 只允许 ROOM_GROUP 且必须是群主，公共大厅根本没有解散路径。
+- 「30 分钟」容易做错成「密钥本身 30 分钟过期」。正确语义是：密钥长期有效，**每次使用**把
+  masterUntil 重置为「现在 + 30 分钟」（续期是重置、不叠加）。
+
+三、实现
+1) 新增 src/perm.js（纯函数、可单测）：
+   - MASTER_WINDOW_MS = 30 分钟；FOUNDER_USERNAME/NICKNAME = 刘子墨
+   - keyMatches() 定长比较（避免时序差异）；默认密钥 lz-qingliao-2026，可用环境变量 PERM_KEY 覆盖
+   - isFounder / isMaster / masterRemainMs / grantMaster / latchFounder
+2) 服务端：
+   - publicUser 下发 founder / master / masterUntil / masterRemainMs
+   - requireUser 内命中「名字+昵称都是刘子墨」即固化 user.founder（改昵称也不会掉权限，防手滑）
+   - 四种登录/注册（账号密码、邮箱、验证码、WorkBuddy 回调除外）均接受 permKey；
+     密钥错误**不阻断登录**，只回 perm.granted=false + error，前端飘提示
+   - 新增 POST /api/auth/perm（登录后在「我的」页激活/续期）
+   - 解散规则改为：私聊不可解散；公共大厅默认 403「公共大厅默认不可解散」，仅最高权限可用；
+     群聊 = 群主或最高权限
+   - 消息 purge / batch-purge：最高权限可删他人消息；canViewRoom 对最高权限直接放行
+   - DELETE /api/files/:id：最高权限可物理删除他人文件（顺带修掉原来那句恒假的 ownerId 判断）
+   - 新增管理接口：POST /api/admin/users/:id/delete（注销指定用户，复用 purgeAccount，返回清理统计）、
+     POST /api/admin/rooms/:id/clear（清空房间消息，带文件的一并释放字节）、GET /api/admin/overview
+   - purgeAccount 增加统计返回值；无人继承而整群删除时，消息计数也计入统计
+3) 前端标准版（public/app.js + style.css）：
+   - 登录/注册页新增「权限密钥」输入（id=ak），所有登录方式都带上 permKey
+   - 「我的」页新增最高权限卡片：未激活 → 输入密钥 + 激活/续期；永久账号 → ✦ 永久最高权限
+   - 消息渲染：senderFounder → .msg.founder，名字加 .founder-who（金色渐变烫金 + 金边 + 6s 流光），
+     头像加双层金环 + 内亮 + 外光晕
+   - 资料页（他人）新增「注销该用户」（仅最高权限可见，两步确认需手输账号名）
+   - 成员面板：解散入口改由服务端 canDissolve 决定（公共大厅文案不同）；最高权限额外多一个「清空本房间全部消息」
+   - 补上一直缺失的 .mini-btn 样式（原来「修改昵称」等按钮是裸文字）
+4) 前端低配版（index-lite.html + app-lite.js）：仅加权限密钥输入与 permKey 传递，
+   **完全不含**任何金色样式/类名（已用测试断言 css/js/html 三处都不含 founder/gold/d4af37）
+
+四、测试与验证
+- 新增 test/perm.js（74 项）：权限模块纯逻辑（含「31 分钟已失效」「续期是重置不是叠加」）、
+  公共大厅普通用户与群主都被拒、密钥错误不阻断登录、最高权限删他人消息/删他人文件/清空房间/解散他人群/
+  注销指定用户、永久账号 founder 与 senderFounder、低配版零金色元素
+- ⚠️ 测试**故意不**对真实公共大厅提交 confirm=true（云端与线上同一套数据，真解散会停掉大家的公共大厅）；
+  改用「最高权限 + 不带 confirm → 400 需要二次确认」证明权限闸已通过，零破坏
+- 回归：本地 583/0、云端 583/0（perm 本地 74 / 云端 71——云端「刘子墨」账号已存在，走搜索验证分支）
+- 视觉：用无头 Chrome 渲染真实 style.css 截图逐项目检烫金名字框与头像金环，确认非「透明字」；
+  为此把渐变文字收进 @supports(background-clip:text)，基础态是金边+实心金字，老内核也不会看不到字
+- 线上冒烟 tools/live-smoke-perm.js 19/19：注册带密钥→master、公共大厅 403、权限闸 400、
+  删他人消息、线上刘子墨账号 founder=true 且 master=true、注销指定用户、两账号自动清理、版本 1.5.0
+- 已发布：https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A（版本 1.5.0 / code 9）
+
+五、遗留
+- 上一轮（清空房间/2GB 配额/5 天保留/网盘独立发布/原生 APK 与 EVE/多选交互改版）因模型中断未全部交付，
+  仅落了 netdisk/docs 与 netdisk/src/core.js 的开头，需要后续单独续做。
+- 低配版目前只支持「用密钥取得最高权限」，管理类按钮（解散公共大厅、注销用户、清空房间）仍只在标准版提供。

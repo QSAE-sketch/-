@@ -1,0 +1,22 @@
+{
+  "name": "chatapp",
+  "version": "1.0.0",
+  "description": "轻量在线聊天与文件传输网站（移动端自适应）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node start.js",
+    "test": "node tools/run-suite.js local",
+    "test:cloud": "node tools/run-suite.js cloud",
+    "test:verify": "node tools/cloud-verify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true,
+  "optionalDependencies": {
+    "better-sqlite3": "^11.5.0"
+  },
+  "dependencies": {
+    "@tencent-ai/workbuddy-cloud-sdk": "^0.1.4-dev.ca27990.202610161713"
+  }
+}

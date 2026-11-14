@@ -1,0 +1,99 @@
+{
+  "generatedAt": "2026-11-08T11:43:49.118Z",
+  "targetDevice": "红米 Note 2",
+  "simulated": "CPU 4x + Regular 3G",
+  "version": "1.4.3",
+  "build": "288ca44dbb",
+  "automated": {
+    "pass": 17,
+    "fail": 0,
+    "items": [
+      {
+        "name": "APK 产物名为「轻聊.apk」，无版本号后缀",
+        "ok": true,
+        "detail": "轻聊.apk"
+      },
+      {
+        "name": "电脑端产物名为「轻聊.exe」，无版本号后缀",
+        "ok": true,
+        "detail": "轻聊.exe"
+      },
+      {
+        "name": "应用名不带版本号",
+        "ok": true
+      },
+      {
+        "name": "版本号只在 version.json 中定义（供设置页「关于」实时下发）",
+        "ok": true
+      },
+      {
+        "name": "网关握手成功",
+        "ok": true,
+        "detail": "status=200"
+      },
+      {
+        "name": "入口页 no-store（重开必回源）",
+        "ok": true
+      },
+      {
+        "name": "前端资源带内容指纹（部署即生效）",
+        "ok": true,
+        "detail": "/app.js?v=0c90b6e7f7"
+      },
+      {
+        "name": "/api/version 返回线上版本",
+        "ok": true,
+        "detail": "1.4.3"
+      },
+      {
+        "name": "版本接口 no-store",
+        "ok": true
+      },
+      {
+        "name": "首屏可交互（登录按钮已绑定事件）",
+        "ok": true
+      },
+      {
+        "name": "首屏内容绘制 < 3000ms（低端模拟）",
+        "ok": true,
+        "detail": "932ms"
+      },
+      {
+        "name": "页面加载完成 < 8000ms（低端模拟）",
+        "ok": true,
+        "detail": "1022ms"
+      },
+      {
+        "name": "接口 P50 < 1500ms（低端模拟）",
+        "ok": true,
+        "detail": "156ms"
+      },
+      {
+        "name": "两个验收账号注册成功",
+        "ok": true
+      },
+      {
+        "name": "A 发消息 → B 立即能看到（跨账号同步）",
+        "ok": true,
+        "detail": "341ms"
+      },
+      {
+        "name": "同步往返 < 3000ms",
+        "ok": true,
+        "detail": "341ms"
+      },
+      {
+        "name": "好友申请实时到达对方",
+        "ok": true
+      }
+    ]
+  },
+  "manual": [
+    "冷启动：划掉后台后重开，首屏出现 < 3 秒，不白屏、不卡在启动画面",
+    "运行流畅：消息列表上下滑动无掉帧、无卡顿，切换「公共/房间/好友/我的」响应即时",
+    "响应较快：点头像进资料页、发消息、同意好友申请，点击到界面变化无迟滞感",
+    "信息同步：手机发消息 → 电脑端/另一台设备立刻收到；好友申请实时出现",
+    "深浅主题：跟随系统 / 按时间 / 手动三种模式切换后界面即时变化、无闪白",
+    "长时间挂后台再回前台：消息补齐、不掉登录、不重复渲染"
+  ]
+}

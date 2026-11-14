@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 8.0+ 自适应图标前景：品牌标志（3 圆角方块 + 1 圆形，2x2 排布）
+     图形收在中心 60x60（24~84）安全区内，圆形 / 方形 / squircle 遮罩下都不会被裁掉 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 左上圆角方块 -->
+    <path
+        android:fillColor="#FF2688FF"
+        android:pathData="M31.8,24 H43.5 A7.8,7.8 0 0 1 51.3,31.8 V43.5 A7.8,7.8 0 0 1 43.5,51.3 H31.8 A7.8,7.8 0 0 1 24,43.5 V31.8 A7.8,7.8 0 0 1 31.8,24 Z" />
+
+    <!-- 右上圆角方块 -->
+    <path
+        android:fillColor="#FF2688FF"
+        android:pathData="M64.5,24 H76.2 A7.8,7.8 0 0 1 84,31.8 V43.5 A7.8,7.8 0 0 1 76.2,51.3 H64.5 A7.8,7.8 0 0 1 56.7,43.5 V31.8 A7.8,7.8 0 0 1 64.5,24 Z" />
+
+    <!-- 左下圆角方块 -->
+    <path
+        android:fillColor="#FF2688FF"
+        android:pathData="M31.8,56.7 H43.5 A7.8,7.8 0 0 1 51.3,64.5 V76.2 A7.8,7.8 0 0 1 43.5,84 H31.8 A7.8,7.8 0 0 1 24,76.2 V64.5 A7.8,7.8 0 0 1 31.8,56.7 Z" />
+
+    <!-- 右下圆形（浅蓝） -->
+    <path
+        android:fillColor="#FF74B6FF"
+        android:pathData="M69,55.36 A13.64,13.64 0 1 0 69,82.64 A13.64,13.64 0 1 0 69,55.36 Z" />
+</vector>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1f6feb">
+<title>文件分享 · 轻聊云网盘</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div class="top">
+  <div class="logo">云网盘<small>轻聊</small></div>
+</div>
+
+<div class="share-box">
+  <div class="card">
+    <div class="big" id="icon">📎</div>
+    <div class="nm" id="name">加载中…</div>
+    <div class="sub" id="sub"></div>
+    <div class="pad" id="codeBox" style="display:none">
+      <input id="code" class="inp" type="text" placeholder="请输入提取码" maxlength="8">
+    </div>
+    <div class="pad">
+      <button id="dl" class="btn">下 载</button>
+    </div>
+    <div class="pad">
+      <p class="tip" id="tip">分享链接来自轻聊云网盘</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hide"></div>
+<script src="/share.js"></script>
+</body>
+</html>

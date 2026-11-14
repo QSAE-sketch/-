@@ -1,0 +1,13 @@
+{
+  "name": "qingliao-netdisk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "轻聊 · 云网盘（独立服务，与轻聊共用账号）",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

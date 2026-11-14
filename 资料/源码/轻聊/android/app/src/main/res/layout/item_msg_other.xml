@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 对方消息：左侧头像 + 昵称 + 白色气泡 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:paddingLeft="10dp"
+    android:paddingRight="54dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/avatar"
+        android:layout_width="34dp"
+        android:layout_height="34dp"
+        android:background="@drawable/bg_logo"
+        android:gravity="center"
+        android:textColor="#FFFFFFFF"
+        android:textSize="11sp" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvName"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/sub"
+            android:textSize="11sp" />
+
+        <TextView
+            android:id="@+id/bubble"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:background="@drawable/bg_bubble_other"
+            android:lineSpacingExtra="3dp"
+            android:paddingLeft="13dp"
+            android:paddingRight="13dp"
+            android:paddingTop="9dp"
+            android:paddingBottom="9dp"
+            android:textColor="@color/text"
+            android:textSize="15sp" />
+    </LinearLayout>
+</LinearLayout>

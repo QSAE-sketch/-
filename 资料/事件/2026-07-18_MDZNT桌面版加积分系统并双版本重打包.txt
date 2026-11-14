@@ -1,0 +1,29 @@
+2026-07-18 事件：MDZNT 桌面版（自用版 + 便携版）加云端积分系统，并重打包两个 EXE
+
+【背景】
+网页端 MDZNT 已先做好积分系统（每小时刷新、固定 10 点、整点清聊天记录）。本次把同套规则落到桌面双版本，并区分云端/本地、便携/自用。
+
+【本次改动（源码层，已通过 22 项断言测试）】
+1. workbuddy_chatbot.py
+   - 新增 CreditSystem 类：1000 点、每周一 0 点刷新、按字数扣点（≤100→1，每+100字+1，>500→10）、最后一条（剩1点）任意长度放行、credits.json 持久化。
+   - 便携版 __init__ 把 ZHP_MODEL_MAP 锁成只剩免费模型 zhipu:glm-4-flash → 模型商城自动只显示免费模型，不能切其它云端。
+   - 积分只在云端 AI（zhipu: 前缀）扣；本地 Ollama 无限不扣。
+   - stream_chat 接入：云端问答前 maybe_refresh + can_send；便携版（enforce）积分=0 拦截并提示可切本地，自用版（不 enforce）用完也能继续。
+   - 新增 get_credit_info() 供前端查积分。
+2. app_launcher.py：MDZNTAPI.get_credit_info() 透传积分信息。
+3. index.html：点主界面头像（userAvatar）弹左上角灰色信息框，停留 3 秒，显示剩余/总积分/下次刷新时间；toast 加 white-space: pre-line 支持多行。
+
+【打包部署（弱机机器2，串行，一次一个）】
+- 自用版：version_tag.py=False → pyinstaller MDZNT.spec → dist/MDZNT.exe → 复制到 可执行文件/（保留 mdznt_config.json）。耗时约 1 分 10 秒。
+- 便携版：version_tag.py=True → pyinstaller MDZNT_portable.spec → dist_portable/MDZNT.exe → 复制到 MDZNT便携版/（保留 portable-models/、一键启动.cmd、使用说明.txt）。耗时约 1 分 26 秒。
+- 打完复位 version_tag.py=False。
+
+【验证】
+- test_credit_desktop.py 22 项断言全过（公式/刷新/最后一条豁免/本地不扣/便携拦截/自用不拦截/模型商城锁定/info结构）。
+- 构建日志确认 workbuddy_chatbot.py changed 已重新打进 EXE。
+- 注：EXE 的 GUI 端到端未实跑，但源码逻辑已测、打包成功。
+
+【交付物】
+- 两个已含积分系统的 EXE：可执行文件/MDZNT.exe（自用版）、MDZNT便携版/MDZNT.exe（便携版）。
+- 源码：workbuddy_chatbot.py / app_launcher.py / index.html 已就地更新。
+- 测试：test_credit_desktop.py。

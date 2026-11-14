@@ -1,0 +1,38 @@
+# 发现：Godot GDScript 中 get_node_or_null() 返回 Variant 致类型推断失败
+
+- 日期：2026-09-01
+- 场景：Godot 4.7.1 测试脚本里链式调用节点方法并 `:=` 赋值
+
+## 现象
+
+```gdscript
+var p = world.get_node_or_null("Player")
+var r_near := p.target_in_reach(near)
+```
+
+报 Parse Error：`Cannot infer the type of 'r_near' variable because the value doesn't have a set type.`
+同理影响 `var eye` / `var far_dist_tiles` 等接收返回值处。
+
+## 根因
+
+`get_node_or_null()` 的返回类型是 **Variant**（不像 `get_node()` 在场景内有类型缓存能推断）。
+因此 `p.target_in_reach(...)` 的返回类型在解析期无法确定，`:=` 推断失败。
+
+## 修复（给接收变量显式标类型，不必给 p 标）
+
+```gdscript
+var p = world.get_node_or_null("Player")        # p 仍是 Variant，没关系
+var r_near: bool = p.target_in_reach(near)       # 给接收变量标类型即可解除推断失败
+var r_far: bool = p.target_in_reach(far)
+var eye: Vector2 = p.global_position + Vector2(0, -20)
+var far_dist_tiles: float = eye.distance_to(Vector2(far.x*T+T*0.5, far.y*T+T*0.5)) / T
+```
+
+只需给"接收返回值"的变量标类型，就能解除推断失败；`p` 本身保持 Variant 无妨。
+
+## 适用
+
+所有用 `get_node_or_null()` 之后链式调用方法并 `:=` 赋值的场景。
+（`get_node()` 在场景内通常有类型提示可推断；`get_node_or_null()` 一律返回 Variant。）
+
+（盘符当前 E:，靠 UUID 0a89e2a3-ade1-4f58-ac7d-1edba7e8f167 识别）

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 系统进入夜间模式时的窗口底色：与站点深蓝主题一致，避免启动闪白 -->
+    <color name="window_bg">#FF0D1524</color>
+    <!-- WebView 加载期间的底色（页面 CSS 生效前显示的就是它） -->
+    <color name="web_bg">#FF0D1524</color>
+    <!-- 夜间状态栏：与深色顶栏同色系 -->
+    <color name="brand_night">#FF131D30</color>
+</resources>

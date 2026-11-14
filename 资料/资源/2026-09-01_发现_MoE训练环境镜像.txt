@@ -1,0 +1,26 @@
+# 发现：机器1 本地 MoE 训练 — 环境与镜像经验（2026-09-01）
+
+## 1. PyTorch 官方源被墙 → 用上海交大 cu128 镜像
+- `download.pytorch.org` 在机器1 实测 curl 0 B/s（被墙/超时），勿用官方源。
+- ✅ 可用：`mirror.sjtu.edu.cn/pytorch-wheels/cu128/`，含 torch 2.7~2.11 的 **cp313** win_amd64 轮子（实测 `torch==2.11.0+cu128`）。
+- ❌ 阿里云 `mirrors.aliyun.com/pytorch-wheels/` 返回"关于我们"页非索引；清华/北外 `pytorch/whl/cu124` 路径 404。
+- RTX 5060 = Blackwell(sm_120)，**必须用 cu128 版 torch**（cu124 的 2.6 不带 sm_120 内核，跑不起来）。
+
+## 2. pip 多 index 被 cpu 版覆盖（关键坑）
+- 现象：`pip install "torch==2.9.1+cu128" --index-url SJTU --extra-index-url pypi` 装出 `2.13.0+cpu`（`cuda_available=False`）。
+- 根因：extra-index(pypi) 有更高版本 torch（无 local 后缀），pip 解析选中它覆盖了 cu128 版。
+- 正解：`pip install "torch==2.11.0+cu128" --index-url https://mirror.sjtu.edu.cn/pytorch-wheels/cu128/`（**不加 extra-index 给 torch**），依赖之后单独从 SJTU pypi 镜像装。
+
+## 3. C++ 训练在本机不可行
+- 本机仅 MinGW-w64 g++（D:\QQ\msys64），**无 MSVC Build Tools、无 CUDA Toolkit/nvcc**。
+- nvcc 官方只支持 MSVC 编译 host 代码 → C++ 训练程序 + CUDA 走不通。
+- Python + torch cu128 wheel **自带 CUDA runtime**（~2.3GB），装完 `torch.cuda.is_available()` 即 True，不需要 nvcc。
+- 用户曾要求"纯 C++ 训 CPU"，但本机既无 nvcc（GPU 路线堵），纯 CPU C++ 写训练循环也极慢且工作量大；最终走 Python + CUDA。
+
+## 4. 0.5B 模型结构铁律（与符号语GPU经验一致）
+- n_embd / n_head 必须 = 64 或 128 的整数（head_dim=64/128），否则 SDPA 慢路径 + loss 不降。
+- 推荐配置：1280/20(=64) 或 1024/16(=64)。初版 1280/16(=80) 已改 20 头。
+
+## 5. Blackwell 卡训练用 SDPA
+- 用 `F.scaled_dot_product_attention` 而非 `nn.MultiheadAttention`（提速 ~12 倍）。本机脚本已用 SDPA。
+- GPU/规模/步数通用经验详见 `资料/资源/2026-09-01_发现_符号语MoE训练GPU经验.txt`（不重复写）。

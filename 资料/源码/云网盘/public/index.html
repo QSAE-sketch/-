@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="theme-color" content="#1f6feb">
+<title>轻聊云网盘</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<div id="top" class="top hide">
+  <div class="logo">云网盘<small>轻聊</small></div>
+  <div class="sp"></div>
+  <span class="who" id="who"></span>
+  <button class="btn-mini" id="logout">退出</button>
+</div>
+
+<!-- 登录 -->
+<div id="auth" class="auth">
+  <div class="brand">
+    <h1>轻聊云网盘</h1>
+    <p>与轻聊共用同一个账号</p>
+  </div>
+  <input id="u" class="inp" type="text" placeholder="轻聊账号" autocomplete="username">
+  <input id="p" class="inp" type="password" placeholder="密码" autocomplete="current-password">
+  <div id="err" class="err"></div>
+  <button id="loginBtn" class="btn">登 录</button>
+  <p class="tip">账号密码由轻聊校验，网盘不保存你的密码<br>没有账号？先去轻聊注册一个</p>
+</div>
+
+<!-- 主界面 -->
+<div id="main" class="wrap hide">
+
+  <div class="card">
+    <div class="card-h">存储空间</div>
+    <div class="quota">
+      <div class="row">
+        <span class="used" id="used">—</span>
+        <span class="remain" id="remain"></span>
+      </div>
+      <div class="track"><div class="fill" id="quotaFill"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="tools">
+      <input id="kw" type="text" placeholder="搜索文件名" class="grow">
+      <select id="type">
+        <option value="">全部类型</option>
+        <option value="image">图片</option>
+        <option value="video">视频</option>
+        <option value="audio">音频</option>
+        <option value="document">文档</option>
+        <option value="archive">压缩包</option>
+        <option value="other">其它</option>
+      </select>
+      <select id="sort">
+        <option value="uploadTime">按时间</option>
+        <option value="fileName">按名称</option>
+        <option value="fileSize">按大小</option>
+      </select>
+      <label class="upload-btn" for="pick">上传</label>
+      <input id="pick" type="file" multiple style="display:none">
+    </div>
+    <div id="upbar" class="upbar hide">
+      <span class="txt" id="upTxt">准备中…</span>
+      <div class="track"><div class="fill" id="upFill"></div></div>
+      <button class="cancel" id="upCancel">取消</button>
+    </div>
+    <div id="list"></div>
+    <div id="more" class="more hide"><button id="moreBtn">加载更多</button></div>
+  </div>
+
+  <p class="tip">单个文件最大 200MB，每人 2GB 总配额</p>
+</div>
+
+<div id="toast" class="toast hide"></div>
+<div id="mask" class="mask hide">
+  <div class="dialog">
+    <div class="h" id="dlgTitle">提示</div>
+    <div class="b" id="dlgBody"></div>
+    <div class="f">
+      <button id="dlgCancel">取消</button>
+      <button id="dlgOk" class="main">确定</button>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

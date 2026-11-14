@@ -1,0 +1,33 @@
+# 事件：MDZNT 复制按钮重做（用户+AI 通用，悬停下方显示）
+日期：2026-07-18 晚（接上一轮"复制按钮"之后）
+
+## 用户新需求
+- 上轮只给 AI 回复加了"复制"按钮（气泡右上角绝对定位），用户消息不能复制。
+- 本轮明确：
+  1. **用户自己说的话也要能复制**（和 AI 一样）。
+  2. 复制按钮**不要**放进聊天输入框。
+  3. 改成：**鼠标移到某条消息上 → 在该消息下方显示「发送时间 + 复制按钮」**，用户消息与 AI 回复行为完全一致。
+
+## 做了什么
+- 改 `index.html`：
+  - `.row` 由 `flex` 横排改为 `flex-direction: column` 纵向排列（气泡在上、操作条在下）。
+  - 新增 `appendMsgActions(row, role, text, time)`：在气泡下方追加 `.msg-actions` 操作条，含「发送时间」（仅 `settings.showTimestamp` 时显示）+「复制」按钮。
+  - `addBubble()`（用户/系统消息）与 `renderRich()`（AI 消息）都调用它 → **用户和 AI 共用同一套逻辑**。
+  - 系统消息（`role==='sys'`）不加操作条，仅保留原时间显示。
+  - `copyText()`/`fbCopy()` 不变：优先 `navigator.clipboard.writeText`，失败回退 `textarea + execCommand('copy')`。
+  - 显隐：`.msg-actions` 默认 `opacity:0; pointer-events:none`，`.row:hover` 时 `opacity:.85; pointer-events:auto`，本身 hover 时 `1`。移开即隐藏，不占地方。
+
+## 验证
+- JS 语法：抽取 `<script>` 用 `new Function()` 校验 → ALL_OK（无白屏风险）。
+- 重打包（弱机串行）：便携版 `version_tag=True` → 自用版 `False`，`dist` 时间戳 16:21 / 16:22。
+- 两版 onedir 的 `index.html` 实测含新逻辑（`msg-actions`=6、`appendMsgActions`=3、`flex-direction: column`=9）。
+
+## 已保存（保存到记忆库）
+- 资源：`资料/资源/2026-07-18_MDZNT积分系统与双版本构建机制.md` 第 9、10 节已记复制按钮重做与最终交付。
+- 游戏成果（注：用户规矩写"游戏成品"，实际 U盘目录名为"游戏成果"，按实际目录存）：
+  - 便携版 → 桌面 `MDZNT便携版/`（覆盖 exe+_internal，保留 portable-models/一键启动.cmd/使用说明.txt）
+  - 两版 onedir → U盘 `资料/游戏成果/2026-07-18_MDZNT_桌面版_便携版/` 与 `_自用版/`
+- `version_tag` 复位 False。
+
+## 结论
+复制功能已符合用户要求：用户消息、AI 回复悬停时下方均显示时间与复制按钮，行为一致；粘贴一直可用（Ctrl+V / 拖文件）。无 BUG（静态校验 + 打包实测通过）。
