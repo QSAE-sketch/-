@@ -1,0 +1,19 @@
+2026-11-14 发现1：静态站点上非 APK 文件如何强制下载
+
+【问题】
+静态托管对 .txt / .py 一类文件返回 text/plain，浏览器会直接打开而不是下载；HTML 的 download 属性在老 Android 浏览器上可能被忽略。
+
+【实测】
+把文件托管为「原名 + .bin」后，CloudStudio Gateway 返回：
+  HTTP 200 / Content-Type: application/octet-stream
+所有浏览器（含红米 Note 2 的老 WebView）都会交给下载器，不会打开乱码。
+APK 保持原扩展名时返回 application/vnd.android.package-archive，行为不变。
+
+【做法】
+exe 选本地文件时，非 .apk 一律复制为「<原名>.bin」，云端表用 stored_name 记录实际托管名；
+页面 href 指向 .bin，download 属性保留原文件名 —— 现代浏览器存下来仍是「笔记.txt」，
+老浏览器忽略 download 时至少也是下载（文件名带 .bin 而已）。
+APK 完全不动。
+
+【验证】
+插入 TXT 测试条目 → 生成页面 href 指向 .bin、download 为 .txt、类型标注 TXT → 点击链接 200 octet-stream → 删除测试条目恢复清单。

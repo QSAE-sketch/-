@@ -1,0 +1,9 @@
+2026-11-14 发现2：GitHub 备份落地要点
+
+- 私有仓库此前有过 AI / 工具侧用不了的案例，大佬因此明确选择公开仓库；不要再劝改私有。
+- Git 装好之后仍可能缺：全局 user.name / user.email、SSH 密钥、gh CLI、远程仓库地址。
+  用「方案 1」= Git Credential Manager 弹窗授权：push 时点一次，凭据自动缓存，不必把 token 贴进对话。
+- 建仓库若勾了 README / LICENSE，首次 push 会报 fetch first；不要强推，
+  用 git pull --rebase origin main 接上远程初始提交后再 push。
+- 可见性可用 curl 读 https://api.github.com/repos/<用户>/<仓库> 的 private 字段确认。
+- 另一条已单独归档：发布（workbuddy_sites_deploy）一个工作区只对应一个应用槽，看 shareLink 是否变化判断覆盖还是新建。

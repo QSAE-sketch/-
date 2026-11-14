@@ -1,0 +1,23 @@
+2026-11-14 事件：APK 下载站云端化与 Git 备份
+
+【背景】
+大佬给了 31 个本地 APK，要做一个「打开就能下载」的网站，后来要求支持远程打开、老设备（红米 Note 2）也能用。
+
+【过程】
+1. 先做本地静态页 + Node 下载服务（Range/206、中文文件名、分享码校验）。
+2. 开通 WorkBuddy 云服务：建 apk_catalog / download_events 两表 + RLS 策略；页面从云端读清单。
+3. 页面形态迭代：打开自动下载 → 玩家按按钮自选下载 → 红米 Note 2 兼容（全 ES5、零图片、零 JS 依赖的静态原生链接）→ 2K 屏响应式卡片网格（纯色浅灰配色）。
+4. 做本地 .exe 管理器（Electron 45.3.2 + 官方 SDK），可改「下载哪些东西 / 排列顺序 / 类型 / 大小 / 名字」。
+5. 扩到任意文件：TXT / PPTX / PDF / PY 等；非 APK 托管为 .bin 以保证点了就下载。
+6. 发布上线：https://apk-download-site.app.workbuddy.host/?sharecode=QQKVVQEL2D
+7. 本地装 Git 2.55，建仓库 D:\apk-download-site，推到 GitHub（方案 1：Git Credential Manager 弹窗授权）。首次 push 被 fetch first 拒绝（远程有 README/LICENSE），用 git pull --rebase 接上后推送成功。
+
+【成果】
+- 线上站点 32 个文件（其中 26 项启用）可远程下载，不依赖本机开机。
+- 本地 exe：D:\APK下载站管理\APK下载站管理.exe（约 378 MB，源码见 资料/源码/APK下载站/）。
+- Git 备份：https://github.com/QSAE-sketch/-（公开，大佬确认私有仓库 AI 侧不可用）。
+
+【遗留 / 注意】
+- 新增的本地文件本体仍需 WorkBuddy 发布一次才能在远程下载（exe 无法调用发布工具）；填外部下载链接则即时生效。
+- 仓库为公开，代码内含 publishableKey 与分享码，属有意为之，不要再劝改私有。
+- 无红米 Note 2 真机，兼容性靠 ES5 + 零 JS 依赖设计保证 + 老 UA 链路实测。
