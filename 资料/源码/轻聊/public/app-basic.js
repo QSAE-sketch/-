@@ -262,6 +262,8 @@
     driveTab: 'files',
     driveKeyword: '',
     drivePage: 1,
+    driveFolder: null,      /* null=全部目录；''=根目录 */
+    driveUpBusy: false,
     pollTimer: null,
     version: null
   };
@@ -906,6 +908,7 @@
   function loadDrive() {
     var q = '/api/drive/files?page=' + num(S.drivePage) + '&size=30';
     if (S.driveKeyword) q += '&keyword=' + encodeURIComponent(S.driveKeyword);
+    if (S.driveFolder !== null && S.driveTab !== 'trash') q += '&folder=' + encodeURIComponent(S.driveFolder);
     if (S.driveTab === 'trash') q = '/api/drive/trash?page=1&size=30';
 
     api('GET', q, null, function (err, d) {
@@ -922,13 +925,36 @@
 
     h += '<div class="card"><div class="ch">存储空间</div><div class="cb">' + quotaHtml() + '</div></div>';
 
+    /* 上传入口（基础版：单片直传，上限 4MB） */
+    h += '<div class="card"><div class="cb">' +
+      '<div class="tipbar">可上传文件到网盘（单个不超过 4MB）。上传到当前所选目录。</div>' +
+      '<input id="inDriveFile" class="ti" type="file" multiple style="display:none">' +
+      '<button class="bt bp full" onclick="LL.drivePick()">＋ 上传文件到网盘</button>' +
+      '<div id="driveUpHint" class="ls" style="margin-top:6px"></div>' +
+      '</div></div>';
+
     h += '<div class="card"><div class="cb">' +
       '<table class="srow"><tr>' +
-      '<td style="width:66%"><input id="inKw" class="ti" type="text" placeholder="搜索文件名" value="' + esc(S.driveKeyword) + '"></td>' +
-      '<td style="width:16%;text-align:center"><button class="bt sm bg" onclick="LL.driveSearch()">搜索</button></td>' +
-      '<td style="width:18%;text-align:right"><button class="bt sm bg" onclick="LL.driveSwitch()">' +
+      '<td style="width:60%"><input id="inKw" class="ti" type="text" placeholder="搜索文件名" value="' + esc(S.driveKeyword) + '"></td>' +
+      '<td style="width:20%;text-align:center"><button class="bt sm bg" onclick="LL.driveSearch()">搜索</button></td>' +
+      '<td style="width:20%;text-align:right"><button class="bt sm bg" onclick="LL.driveSwitch()">' +
       (S.driveTab === 'trash' ? '我的文件' : '回收站') + '</button></td>' +
       '</tr></table></div></div>';
+
+    /* 目录切换栏（全部 / 根目录 / 各目录） */
+    if (S.driveTab !== 'trash') {
+      var folders = d.folders || [];
+      if (folders.length) {
+        h += '<div class="card"><div class="cb"><div class="chips">';
+        h += '<button class="chip' + (S.driveFolder === null ? ' on' : '') + '" onclick="LL.driveFolderGo(\'__all__\')">全部目录</button>' +
+             '<button class="chip' + (S.driveFolder === '' ? ' on' : '') + '" onclick="LL.driveFolderGo(\'__root__\')">根目录</button>';
+        for (var k = 0; k < folders.length; k++) {
+          h += '<button class="chip' + (S.driveFolder === folders[k] ? ' on' : '') + '" onclick="LL.driveFolderGo(' + esc(JSON.stringify(folders[k])) + ')">' +
+            '[目录] ' + esc(folders[k]) + '</button>';
+        }
+        h += '</div></div></div>';
+      }
+    }
 
     h += '<div class="card"><div class="ch">' +
       (S.driveTab === 'trash' ? '回收站（' + num(d.total) + '）' : '我的文件（' + num(d.total) + '）') +
@@ -942,6 +968,7 @@
         h += '<div class="line' + (i === items.length - 1 ? ' last' : '') + '">' +
           '<div class="lm"><div class="lt">' + esc(f.name) + '</div>' +
           '<div class="ls">' + fmtSize(f.size) + ' · ' + esc(f.typeLabel || '') +
+          (f.folder ? ' · [目录] ' + esc(f.folder) : '') +
           (f.fromChat ? ' · 来自' + esc(f.roomName || '聊天') : '') + '</div></div>' +
           '<div class="lr">';
         if (S.driveTab === 'trash') {
@@ -949,6 +976,7 @@
             '<button class="bt sm bd2" style="margin-left:4px" onclick="LL.drivePurge(\'' + esc(f.fileId) + '\')">彻底删</button>';
         } else {
           h += '<a class="bt sm bg" href="' + esc(f.downloadUrl) + '">下载</a>' +
+            '<button class="bt sm bg" style="margin-left:4px" onclick="LL.driveMove(\'' + esc(f.fileId) + '\',\'' + esc(f.folder || '') + '\')">移动</button>' +
             '<button class="bt sm bd2" style="margin-left:4px" onclick="LL.driveDel(\'' + esc(f.fileId) + '\')">删除</button>';
         }
         h += '</div></div>';
@@ -967,7 +995,111 @@
     h += '</div>';
 
     $('view').innerHTML = h;
+    var fi = $('inDriveFile');
+    if (fi) fi.onchange = function () {
+      var list = [];
+      if (fi.files) for (var j = 0; j < fi.files.length; j++) list.push(fi.files[j]);
+      driveUploadQueue(list);
+      fi.value = '';
+    };
   }
+
+  /* 目录切换：全部 / 根目录 / 指定目录 */
+  function driveFolderGo(v) {
+    if (v === '__all__') S.driveFolder = null;
+    else if (v === '__root__') S.driveFolder = '';
+    else S.driveFolder = v;
+    S.drivePage = 1;
+    loadDrive();
+  }
+
+  /* 移动到目录：prompt 输入目录名（老内核可靠），留空=根目录 */
+  function driveMove(fileId, cur) {
+    var to = window.prompt('移动到哪个目录？（留空 = 移到根目录）', cur || '');
+    if (to === null) return;
+    api('PATCH', '/api/drive/files/' + encodeURIComponent(fileId), { folder: String(to) }, function (err) {
+      if (err) { alert('移动失败：' + err.message); return; }
+      loadDrive();
+    });
+  }
+
+  /* 网盘上传队列（基础版：单片直传，逐个来） */
+  function driveUploadQueue(list) {
+    if (!list.length || S.driveUpBusy) return;
+    var sum = 0;
+    for (var i = 0; i < list.length; i++) sum += num(list[i].size);
+    if (S.storage && num(S.storage.remain) < sum) {
+      alert('存储空间不足：剩余 ' + (S.storage.remainText || fmtSize(S.storage.remain)) + '，本次共 ' + fmtSize(sum));
+      return;
+    }
+    S.driveUpBusy = true;
+    var idx = 0;
+    function next() {
+      if (idx >= list.length) {
+        S.driveUpBusy = false;
+        setText($('driveUpHint'), '上传完成');
+        loadDrive();
+        return;
+      }
+      var f = list[idx++];
+      setText($('driveUpHint'), '正在上传 ' + f.name + '（' + num(idx) + '/' + list.length + '）…');
+      driveUploadOne(f, function (ok) {
+        if (!ok) { S.driveUpBusy = false; return; }
+        next();
+      });
+    }
+    next();
+  }
+
+  /* 单个文件上传：init(roomId 空=网盘) → 单片 PUT → complete；随后打上目录标签 */
+  function driveUploadOne(file, cb) {
+    if (num(file.size) > 4 * 1024 * 1024) {
+      alert('网盘单个文件上限 4MB（这个文件 ' + fmtSize(file.size) + '），请换小一点的文件');
+      cb(false); return;
+    }
+    api('POST', '/api/files/init', {
+      name: file.name,
+      size: num(file.size),
+      mime: file.type || 'application/octet-stream',
+      roomId: ''
+    }, function (err, info) {
+      if (err) { alert('上传失败：' + err.message); cb(false); return; }
+      var fileId = info.fileId;
+      var url = withShare('/api/files/' + encodeURIComponent(fileId) + '/chunk?i=0');
+      var xhr = null;
+      try { xhr = new XMLHttpRequest(); } catch (e) { alert('不支持上传'); cb(false); return; }
+      var done = 0;
+      function fin(okFlag, why) {
+        if (done) return; done = 1;
+        if (!okFlag) { alert('上传失败：' + why); cb(false); return; }
+        api('POST', '/api/files/' + encodeURIComponent(fileId) + '/complete', {}, function (e2, d2) {
+          if (e2) { alert('上传收尾失败：' + e2.message); cb(false); return; }
+          if (d2 && d2.storage) S.storage = d2.storage;
+          /* 传到当前所选目录；根目录/全部目录时放根目录 */
+          var folder = (S.driveFolder === null || S.driveFolder === undefined) ? '' : S.driveFolder;
+          if (folder) {
+            api('PATCH', '/api/drive/files/' + encodeURIComponent(fileId), { folder: folder }, function () { cb(true); });
+          } else cb(true);
+        });
+      }
+      try {
+        xhr.open('PUT', url, true);
+        xhr.setRequestHeader('X-Token', S.token);
+        xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      } catch (e3) { fin(false, '无法发起上传'); return; }
+      var timer = setTimeout(function () { try { xhr.abort(); } catch (e4) {} fin(false, '上传超时'); }, 120000);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4 || done) return;
+        clearTimeout(timer);
+        if (xhr.status === 200) fin(true); else fin(false, 'HTTP ' + xhr.status);
+      };
+      try { xhr.send(file); } catch (e5) { fin(false, '发送失败：' + e5.message); }
+    });
+  }
+
+  LL.drivePick = function () { var fi = $('inDriveFile'); if (fi) fi.click(); };
+  LL.driveFolderGo = driveFolderGo;
+  LL.driveMove = driveMove;
 
   LL.driveSearch = function () {
     var el = $('inKw');

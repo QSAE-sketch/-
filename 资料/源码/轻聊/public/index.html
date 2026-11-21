@@ -32,12 +32,12 @@
     } catch (e3) { bad = true; }
   } catch (e4) { bad = true; }
   if (!bad) return;
-  try { document.cookie = 'll_cap=lite; path=/; max-age=2592000'; } catch (e5) {}
+  try { document.cookie = 'll_cap=basic; path=/; max-age=2592000'; } catch (e5) {}
   try {
     var q = String(location.search || '');
     q = q.replace(/[?&]lite=[^&]*/g, '');
     if (q.charAt(0) === '&') q = '?' + q.slice(1);
-    location.replace((location.pathname || '/') + q + (q ? '&' : '?') + 'lite=1');
+    location.replace((location.pathname || '/') + q + (q ? '&' : '?') + 'lite=2');
   } catch (e6) {}
 })();
 </script>
@@ -125,7 +125,7 @@
     <div class="tb-right">
       <span id="tbUser" class="tb-user"></span>
       <!-- 手动切换版本；服务器会把 href 注入成保留 sharecode 等原参数的地址 -->
-      <a id="capSwitch" class="icon-btn" href="/?lite=1" title="切换到低配兼容模式"
+      <a id="capSwitch" class="icon-btn" href="/?lite=2" title="切换到基础版（老设备兼容）"
          style="text-decoration:none;display:flex;align-items:center;justify-content:center">⇄</a>
       <button id="themeBtn" class="icon-btn" title="切换主题">🌙</button>
     </div>

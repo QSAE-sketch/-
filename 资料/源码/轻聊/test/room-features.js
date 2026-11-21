@@ -86,8 +86,8 @@ async function uploadFile(token, roomId, payload, opts) {
 }
 
 (async () => {
-  /* ---------------- A. 统一基础版（全设备只有一个前端版本） ---------------- */
-  console.log('\n【A】统一基础版分发（红米等老设备全兼容）');
+  /* ---------------- A. 两档分发（标准版 / 基础版，低配版已删） ---------------- */
+  console.log('\n【A】两档分发（老设备默认基础版，可手动切换）');
 
   let r;
   const UAS = {
@@ -95,31 +95,30 @@ async function uploadFile(token, roomId, payload, opts) {
     modern: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     ancient: 'Mozilla/5.0 (Linux; Android 4.4.2; HM NOTE 1LTE) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.0.0 Mobile Safari/537.36'
   };
-  for (const [label, ua] of Object.entries(UAS)) {
-    r = await req('GET', '/', null, null, { headers: { 'User-Agent': ua } });
-    check(label + ' → 统一基础版', r.status === 200 &&
+  // 老设备 → 基础版
+  for (const label of ['redmi', 'ancient']) {
+    r = await req('GET', '/', null, null, { headers: { 'User-Agent': UAS[label] } });
+    check(label + ' → 基础版', r.status === 200 &&
       r.text.indexOf('data-ll-cap="basic"') >= 0 && r.text.indexOf('app-basic.js') >= 0, r.status);
-    check(label + ' 不加载标准/低配脚本', r.text.indexOf('src="/app.js"') < 0 &&
-      r.text.indexOf('src="/app-lite.js"') < 0);
+    check(label + ' 页面有切换到标准版入口', r.text.indexOf('lite=0') >= 0);
   }
-  check('基础版内联了守门脚本', r.text.indexOf('__LL_LITE') < 0 && r.text.indexOf('__LL') >= 0);
+  // 现代设备 → 标准版
+  r = await req('GET', '/', null, null, { headers: { 'User-Agent': UAS.modern } });
+  check('现代浏览器 → 标准版', r.status === 200 && r.text.indexOf('src="/app.js?v=') >= 0, r.status);
+  check('标准版页面有切换到基础版入口', r.text.indexOf('lite=2') >= 0);
 
-  // cookie / 能力头 / 省流量 / 显式 ?lite= 都不能切走基础版（全站单版本）
-  const probes = [
-    ['Cookie ll_cap=lite', { Cookie: 'll_cap=lite' }],
-    ['能力头 X-LL-Cap=full', { 'X-LL-Cap': 'full' }],
-    ['省流量 Save-Data', { 'Save-Data': 'on' }],
-    ['低内存 Device-Memory', { 'Device-Memory': '0.5' }]
-  ];
-  for (const [label, hdr] of probes) {
-    r = await req('GET', '/', null, null, { headers: Object.assign({ 'User-Agent': UAS.modern }, hdr) });
-    check(label + ' 仍发基础版', r.text.indexOf('data-ll-cap="basic"') >= 0 &&
-      r.text.indexOf('src="/app-basic.js?v=') >= 0);
-  }
-  r = await req('GET', '/?lite=1', null, null, { headers: { 'User-Agent': UAS.redmi } });
-  check('显式 ?lite=1 也不再切走（只有一个版本）', r.text.indexOf('data-ll-cap="basic"') >= 0);
+  // 手动切换：?lite=2 基础 / ?lite=0 标准（任意设备都尊重）
+  r = await req('GET', '/?lite=2', null, null, { headers: { 'User-Agent': UAS.modern } });
+  check('?lite=2 强制基础版并写 cookie', r.text.indexOf('data-ll-cap="basic"') >= 0 &&
+    /ll_cap=basic/.test(String(r.headers['set-cookie'] || '')));
+  r = await req('GET', '/?lite=0', null, null, { headers: { 'User-Agent': UAS.redmi } });
+  check('?lite=0 强制标准版', r.text.indexOf('src="/app.js?v=') >= 0);
 
-  // 【关键修复】线上网关要求所有资源带 sharecode：注入的 JS/CSS URL 必须保留原 query
+  // 低配版已删除：不再有第三档资源
+  r = await req('GET', '/app-lite.js', null, null, { headers: { 'User-Agent': UAS.redmi } });
+  check('低配版 JS 已删除（404）', r.status === 404, r.status);
+
+  // 【关键】线上网关要求资源带 sharecode：注入的 JS/CSS URL 必须保留原 query
   r = await req('GET', '/?sharecode=TESTCODE', null, null, { headers: { 'User-Agent': UAS.redmi } });
   check('资源 URL 注入 sharecode（/app-basic.js）', r.text.indexOf('src="/app-basic.js?sharecode=TESTCODE') >= 0,
     (r.text.match(/src="\/app-basic\.js[^"]*"/) || [''])[0]);
@@ -161,8 +160,7 @@ async function uploadFile(token, roomId, payload, opts) {
   check('基础版 HTML 不含金色烫金元素（保持低配一致）',
     basicHtml.indexOf('d4af37') < 0 && basicCss.indexOf('d4af37') < 0);
   check('基础版 HTML 自带设备自检入口', /设备自检/.test(basicHtml));
-  check('基础版 HTML 无版本切换链接（全站单版本）',
-    basicHtml.indexOf('lite=0') < 0 && basicHtml.indexOf('lite=1') < 0 && basicHtml.indexOf('lite=2') < 0);
+  check('基础版 HTML 有切换到标准版入口', basicHtml.indexOf('lite=0') >= 0);
 
   /* ---------------- B. 两版共用同一套数据 ---------------- */
   console.log('\n【B】低配版与标准版数据互通');

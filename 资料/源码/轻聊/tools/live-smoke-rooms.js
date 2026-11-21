@@ -62,19 +62,19 @@ function sysTexts(list) {
 (async () => {
   console.log('\n【线上】设备能力分发');
   let r = await req('GET', '/', null, null, { ua: OLD_UA });
-  check('老设备 UA 拿到低配兼容版', r.status === 200 &&
-    r.text.indexOf('data-ll-cap="lite"') >= 0 && r.text.indexOf('app-lite.js') >= 0, r.status);
+  check('老设备 UA 拿到基础版', r.status === 200 &&
+    r.text.indexOf('data-ll-cap="basic"') >= 0 && r.text.indexOf('app-basic.js') >= 0, r.status);
   r = await req('GET', '/', null, null, { ua: NEW_UA });
   check('现代 UA 拿到标准版', r.status === 200 && r.text.indexOf('src="/app.js?v=') >= 0, r.status);
-  r = await req('GET', '/?lite=1', null, null, { ua: NEW_UA });
-  check('强制低配可用且写 cookie', r.text.indexOf('data-ll-cap="lite"') >= 0 &&
-    /ll_cap=lite/.test(String(r.headers['set-cookie'] || '')), String(r.headers['set-cookie']));
-  r = await req('GET', '/app-lite.js', null, null, { ua: OLD_UA });
-  check('低配 JS 线上可访问', r.status === 200 && r.text.length > 10000, r.status);
-  r = await req('GET', '/style-lite.css', null, null, { ua: OLD_UA });
-  check('低配 CSS 线上可访问', r.status === 200 && r.text.length > 3000, r.status);
+  r = await req('GET', '/?lite=2', null, null, { ua: NEW_UA });
+  check('强制基础版可用且写 cookie', r.text.indexOf('data-ll-cap="basic"') >= 0 &&
+    /ll_cap=basic/.test(String(r.headers['set-cookie'] || '')), String(r.headers['set-cookie']));
+  r = await req('GET', '/app-basic.js', null, null, { ua: OLD_UA });
+  check('基础版 JS 线上可访问', r.status === 200 && r.text.length > 10000, r.status);
+  r = await req('GET', '/style-basic.css', null, null, { ua: OLD_UA });
+  check('基础版 CSS 线上可访问', r.status === 200 && r.text.length > 2000, r.status);
 
-  console.log('\n【线上】低配设备走完整业务流程（与标准版同库）');
+  console.log('\n【线上】基础版设备走完整业务流程（与标准版同库）');
   const A = await register('lrA', '线上甲', OLD_UA);
   const B = await register('lrB', '线上乙', NEW_UA);
   check('低配 UA 可注册', !!A.token);

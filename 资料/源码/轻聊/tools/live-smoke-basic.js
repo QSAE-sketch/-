@@ -100,9 +100,8 @@ async function uploadOneChunk(token, name, mime, buf, roomId) {
     { status: r.status, hit: r.raw.toString().indexOf('data-ll-cap="basic"') });
   check('基础版页面加载的是 app-basic.js',
     r.raw.toString().indexOf('app-basic.js') >= 0);
-  check('基础版不再加载标准版与低配版脚本',
-    r.raw.toString().indexOf('src="/app.js"') < 0 &&
-    r.raw.toString().indexOf('src="/app-lite.js"') < 0);
+  check('基础版不加载标准版脚本',
+    r.raw.toString().indexOf('src="/app.js"') < 0);
   check('基础版内联了守门脚本（初始化失败可自愈）',
     r.raw.toString().indexOf('__LL') >= 0);
 
@@ -126,8 +125,7 @@ async function uploadOneChunk(token, name, mime, buf, roomId) {
   const fullHtml = r.raw.toString();
   check('现代浏览器 → 标准版',
     fullHtml.indexOf('src="/app.js') >= 0 &&
-    fullHtml.indexOf('app-basic') < 0 &&
-    fullHtml.indexOf('app-lite') < 0,
+    fullHtml.indexOf('app-basic') < 0,
     { appjs: fullHtml.indexOf('src="/app.js'), basic: fullHtml.indexOf('app-basic') });
 
   /* 静态资源都得能取到（线上代理会校验 sharecode，这里走的是同一套） */

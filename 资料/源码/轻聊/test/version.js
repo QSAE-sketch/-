@@ -48,9 +48,8 @@ const disk = JSON.parse(fs.readFileSync(path.join(ROOT, 'version.json'), 'utf8')
 /** 本地复算构建指纹，用于和接口返回值比对 */
 function expectedBuild() {
   const h = crypto.createHash('sha1');
-  // 与 server.js buildId() 保持完全一致：三档网页（标准 / 低配 / 基础）都纳入指纹
+  // 与 server.js buildId() 保持完全一致：两档网页（标准 / 基础）都纳入指纹
   const files = ['version.json', 'public/app.js', 'public/style.css',
-    'public/app-lite.js', 'public/style-lite.css',
     'public/app-basic.js', 'public/style-basic.css'];
   for (const f of files) {
     try { h.update(f); h.update(fs.readFileSync(path.join(ROOT, f))); }

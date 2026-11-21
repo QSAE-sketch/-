@@ -301,26 +301,27 @@ async function createRoom(token, name) {
     check('线上刘子墨账号为最高权限', !!(hit && hit.master === true), hit);
   }
 
-  // 视觉：标准版有金色烫金样式，低配版完全没有
+  // 视觉：标准版有金色烫金样式，基础版完全没有
   const cssStd = fs.readFileSync(path.join(ROOT, 'public/style.css'), 'utf8');
-  const cssLite = fs.readFileSync(path.join(ROOT, 'public/style-lite.css'), 'utf8');
+  const cssBasic = fs.readFileSync(path.join(ROOT, 'public/style-basic.css'), 'utf8');
   const jsStd = fs.readFileSync(path.join(ROOT, 'public/app.js'), 'utf8');
-  const jsLite = fs.readFileSync(path.join(ROOT, 'public/app-lite.js'), 'utf8');
+  const jsBasic = fs.readFileSync(path.join(ROOT, 'public/app-basic.js'), 'utf8');
   check('标准版样式含烫金名字框', cssStd.indexOf('founder-who') >= 0 && cssStd.indexOf('#d4af37') >= 0);
   check('标准版样式含金色头像框', /\.msg\.founder \.av/.test(cssStd));
   check('标准版脚本带 senderFounder 渲染', jsStd.indexOf('senderFounder') >= 0);
-  check('低配版样式完全不含金色元素',
-    cssLite.indexOf('founder') < 0 && cssLite.indexOf('d4af37') < 0 && cssLite.indexOf('gold') < 0);
-  check('低配版脚本不渲染金色标识', jsLite.indexOf('senderFounder') < 0 && jsLite.indexOf('founder') < 0);
+  check('基础版样式完全不含金色元素',
+    cssBasic.indexOf('founder') < 0 && cssBasic.indexOf('d4af37') < 0 && cssBasic.indexOf('gold') < 0);
+  check('基础版脚本不渲染金色标识',
+    jsBasic.indexOf('senderFounder') < 0 && jsBasic.indexOf('founder-who') < 0 && jsBasic.indexOf('d4af37') < 0);
 
-  // 低配版页面同样能提交权限密钥（功能一致，只是不展示金色）
-  const liteHtml = fs.readFileSync(path.join(ROOT, 'public/index-lite.html'), 'utf8');
-  check('低配版登录页也支持权限密钥', /id="ak"/.test(liteHtml));
-  check('低配版脚本会带上 permKey', jsLite.indexOf('permKey') >= 0);
+  // 基础版页面同样能提交权限密钥（功能一致，只是不展示金色）
+  const basicHtmlPerm = fs.readFileSync(path.join(ROOT, 'public/index-basic.html'), 'utf8');
+  check('基础版登录页也支持权限密钥', /id="inKey"/.test(basicHtmlPerm));
+  check('基础版脚本会带上 permKey', jsBasic.indexOf('permKey') >= 0);
 
-  // 分发：老设备现在拿到的是更保守的「基础版」，且三档里都不含金色标识
+  // 分发：老设备拿到基础版，且不含金色标识
   r = await req('GET', '/', null, null, { headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 5.1; Redmi Note 2 Build/LMY47D) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/39.0.0.0 Mobile Safari/537.36' } });
-  check('老设备分发到基础版（比低配更保守的一档）', r.text.indexOf('data-ll-cap="basic"') >= 0);
+  check('老设备分发到基础版', r.text.indexOf('data-ll-cap="basic"') >= 0);
   check('基础版 HTML 不含金色样式', r.text.indexOf('founder') < 0);
 
   const basicHtml = fs.readFileSync(path.join(ROOT, 'public/index-basic.html'), 'utf8');

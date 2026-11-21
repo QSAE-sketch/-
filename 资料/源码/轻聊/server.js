@@ -966,8 +966,6 @@ function buildId() {
     ['version.json', VERSION_FILE],
     ['public/app.js', path.join(PUBLIC_DIR, 'app.js')],
     ['public/style.css', path.join(PUBLIC_DIR, 'style.css')],
-    ['public/app-lite.js', path.join(PUBLIC_DIR, 'app-lite.js')],
-    ['public/style-lite.css', path.join(PUBLIC_DIR, 'style-lite.css')],
     ['public/app-basic.js', path.join(PUBLIC_DIR, 'app-basic.js')],
     ['public/style-basic.css', path.join(PUBLIC_DIR, 'style-basic.css')]
   ];
@@ -2144,9 +2142,8 @@ const MIME = {
  */
 let assetVerCache = { key: '', v: '' };
 function assetVersion() {
-  // 三套网页共用一个指纹：任一份代码变了，所有档位的资源 URL 都会更新
-  const names = ['app.js', 'style.css', 'app-lite.js', 'style-lite.css',
-    'app-basic.js', 'style-basic.css'];
+  // 两套网页共用一个指纹：任一份代码变了，所有档位的资源 URL 都会更新
+  const names = ['app.js', 'style.css', 'app-basic.js', 'style-basic.css'];
   let key = '';
   for (const n of names) {
     try {
@@ -2237,7 +2234,6 @@ function uaLooksLite(ua) {
 
 const ENTRY_OF_LEVEL = {
   full: '/index.html',
-  lite: '/index-lite.html',
   basic: '/index-basic.html'
 };
 
@@ -2254,40 +2250,37 @@ const ENTRY_OF_LEVEL = {
  */
 function capabilityLevel(req, url) {
   const forced = String(url.searchParams.get('lite') || '').toLowerCase();
-  if (forced === '2' || forced === 'basic') return 'basic';
-  if (forced === '1' || forced === 'lite') return 'lite';
+  // 两档：full=标准版，basic=基础版。旧参数 lite/1 统一当基础版（兼容老链接）
+  if (forced === '2' || forced === 'basic' || forced === '1' || forced === 'lite') return 'basic';
   if (forced === '0' || forced === 'full') return 'full';
 
   const ua = req.headers['user-agent'];
   const uaBasic = uaLooksBasic(ua);
-  /* UA 说是 basic 时，只接受 basic 或 full 的显式偏好，lite 降级为 basic */
   const respect = (v) => {
     if (v === 'full') return 'full';
-    if (v === 'basic') return 'basic';
-    if (v === 'lite') return uaBasic ? 'basic' : 'lite';
+    if (v === 'basic' || v === 'lite') return 'basic';  // lite 档已删，归到基础版
     return '';
   };
-
   const ck = respect(cookieOf(req, 'll_cap'));
   if (ck) return ck;
   const hdr = respect(String(req.headers['x-ll-cap'] || '').toLowerCase());
   if (hdr) return hdr;
 
-  if (String(req.headers['save-data'] || '').toLowerCase() === 'on') return 'lite';
+  if (String(req.headers['save-data'] || '').toLowerCase() === 'on') return 'basic';
   const mem = Number(req.headers['device-memory'] || 0);
-  if (mem > 0 && mem <= 1) return 'lite';
+  if (mem > 0 && mem <= 1) return 'basic';
 
-  if (uaBasic) return 'basic';
-  return uaLooksLite(ua) ? 'lite' : 'full';
+  // 老设备一律基础版；其余标准版
+  if (uaBasic || uaLooksLite(ua)) return 'basic';
+  return 'full';
 }
 
 function serveStatic(req, res, pathname, url) {
   const isEntry = pathname === '/' || pathname === '/index.html';
-  // 【统一版】所有设备一律发基础版：红米 Note 2 这类老 WebView 加载不动标准版
-  // （157KB 脚本 + CSS 变量 + 图片），且三档分发带来的切换本身也是负担。
-  // 不再按 UA/cookie 分档，全站只有一个前端版本。
-  const level = 'basic';
-  let rel = isEntry ? '/index-basic.html' : pathname;
+  // 两档分发：老设备(红米 Note 2 等)默认基础版，现代设备标准版；用户可手动切换。
+  // 低配版(lite)已删除，只剩 full / basic 两档。
+  const level = capabilityLevel(req, url);
+  let rel = isEntry ? (ENTRY_OF_LEVEL[level] || '/index-basic.html') : pathname;
   rel = rel.replace(/\.\./g, '');
   const file = path.join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR)) return fail(res, 403, 'forbidden');
@@ -2341,11 +2334,7 @@ function serveStatic(req, res, pathname, url) {
         if (key !== 'lite') q.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
       });
       const tail = q.length ? '?' + q.join('&') + '&v=' + v : '?v=' + v;
-      if (rel === '/index-lite.html') {
-        html = html
-          .replace('href="/style-lite.css"', 'href="/style-lite.css' + tail + '"')
-          .replace('src="/app-lite.js"', 'src="/app-lite.js' + tail + '"');
-      } else if (rel === '/index-basic.html') {
+      if (rel === '/index-basic.html') {
         html = html
           .replace('href="/style-basic.css"', 'href="/style-basic.css' + tail + '"')
           .replace('src="/app-basic.js"', 'src="/app-basic.js' + tail + '"');

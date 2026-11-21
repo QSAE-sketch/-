@@ -15,10 +15,11 @@ const path = require('path');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-const code = fs.readFileSync(path.join(ROOT, 'public/app-lite.js'), 'utf8');
-const html = fs.readFileSync(path.join(ROOT, 'public/index-lite.html'), 'utf8');
+// 低配版已删除；老内核 boot 测试改跑基础版（最保守档）
 const basicCode = fs.readFileSync(path.join(ROOT, 'public/app-basic.js'), 'utf8');
 const basicHtml = fs.readFileSync(path.join(ROOT, 'public/index-basic.html'), 'utf8');
+const code = basicCode;
+const html = basicHtml;
 let pass = 0, fail = 0;
 function check(name, cond, extra) {
   if (cond) { pass++; console.log('  ✓ ' + name); }

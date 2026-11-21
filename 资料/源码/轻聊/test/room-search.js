@@ -139,9 +139,7 @@ const uniq = 'sr' + Date.now().toString(36);
   check('网页标准版有搜索房间入口', appJs.indexOf('搜索房间') > 0);
   check('网页标准版调用搜索接口', appJs.indexOf('/api/rooms/search') > 0);
 
-  const appLite = fs.readFileSync(require('path').join(ROOT, 'public/app-lite.js'), 'utf8');
   const appBasic = fs.readFileSync(require('path').join(ROOT, 'public/app-basic.js'), 'utf8');
-  check('低配版不带房间搜索', appLite.indexOf('/api/rooms/search') < 0 && appLite.indexOf('进去看看') < 0);
   check('基础版不带房间搜索', appBasic.indexOf('/api/rooms/search') < 0 && appBasic.indexOf('进去看看') < 0);
 
   const cpp = fs.readFileSync(require('path').join(ROOT, 'native-win/src/main.cpp'), 'utf8');

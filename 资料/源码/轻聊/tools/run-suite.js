@@ -38,7 +38,6 @@ const TESTS = [
   'test/limits.js',
   'test/avatar.js',
   'test/room-search.js',
-  'test/lite-boot.js',
   'test/ui.js'
 ];
 
@@ -57,8 +56,20 @@ async function cloudCleanup() {
     const cs = new CloudStore();
     await cs.load();
     const keys = [];
-    cs.mem.forEach((b, ns) => b.forEach((rec, id) => keys.push([ns, id])));
+    const created = [];
+    cs.mem.forEach((b, ns) => b.forEach((rec, id) => {
+      keys.push([ns, id]);
+      if (!beforeCloud.has(ns + '/' + id)) created.push({ ns, id });
+    }));
     if (!keys.length) return;
+    // 【测试留痕】把本次新建的文档清单落盘，方便日后精确清理（哪怕自动清理失败）
+    try {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const outFile = path.join(__dirname, '..', 'data-backups', 'test-created-' + stamp + '.json');
+      fs.mkdirSync(path.dirname(outFile), { recursive: true });
+      fs.writeFileSync(outFile, JSON.stringify({ at: new Date().toISOString(), count: created.length, items: created }, null, 2), 'utf8');
+      console.log('[留痕] 本次测试新建 ' + created.length + ' 条已记入 ' + path.basename(outFile));
+    } catch (e) { console.log('[留痕] 写入失败：' + (e && e.message)); }
     const client = cs.cloud;
     let n = 0;
     for (const [ns, id] of keys) {
