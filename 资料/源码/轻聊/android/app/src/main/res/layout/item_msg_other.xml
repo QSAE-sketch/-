@@ -9,14 +9,28 @@
     android:paddingTop="6dp"
     android:paddingBottom="6dp">
 
-    <TextView
-        android:id="@+id/avatar"
+    <!-- 头像：底色方块 + 首字占位，真实头像图加载到后盖在上面 -->
+    <FrameLayout
+        android:id="@+id/avatarBox"
         android:layout_width="34dp"
-        android:layout_height="34dp"
-        android:background="@drawable/bg_logo"
-        android:gravity="center"
-        android:textColor="#FFFFFFFF"
-        android:textSize="11sp" />
+        android:layout_height="34dp">
+
+        <TextView
+            android:id="@+id/avatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_logo"
+            android:gravity="center"
+            android:textColor="#FFFFFFFF"
+            android:textSize="11sp" />
+
+        <ImageView
+            android:id="@+id/avatarImg"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="fitXY"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <LinearLayout
         android:layout_width="wrap_content"

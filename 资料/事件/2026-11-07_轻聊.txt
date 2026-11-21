@@ -130,3 +130,10 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 验证：注册测试账号 + 上传纯绿 PNG 头像 → exe --shot 截图，侧栏左上角头像正确显示绿色图片（修复前只能是色块首字），
   侧栏「房间/好友」两栏正常；测试账号已注销、截图已删
 · 产物：轻聊.exe 685568B(14:57 编译)、轻聊.apk versionCode=24/2.4.7；线上已发布 2.4.7/code24，链接不变
+
+— 2026-11-21　v2.4.8 APK 原生头像 + v2.4.9 底部导航点击区
+· 用户问「APK 有这问题吗」→ 诊断：APK 比exe更彻底——从来没实现头像图片加载，User/Friend/Message 都没 avatar 字段，永远色块+首字（服务端 senderAvatar 一直有返回）。卡顿/刷新问题 APK 没有（无流光定时器、无刷新按钮、3秒增量轮询）
+· APK 补真实头像：Api 加 avatar/senderAvatar 解析；新增 AvatarLoader（LruCache 内存缓存≈4MB、单线程串行下载、失败集合跳过、BitmapFactory 降采样、后台线程圆形裁剪 PorterDuff SRC_IN）；item_msg_other.xml 头像区改 FrameLayout{TextView首字 + ImageView圆形图}；MsgAdapter 用 tag 防 ListView 复用错位，缓存命中直接盖图；MainActivity 创建 loader(96px) 传 adapter
+· 编译 JDK17/D://jdk17 通过，轻聊.apk 2.4.8/code25 124744B；dex 校验含 AvatarLoader。模拟器(ql21 AVD)实测中途用户打断，测试账号 apkv970241(橙头像)已注销，ql_store.xml/apk1.png 已删，模拟器已关
+· v2.4.9：用户嫌网页底部导航难点 → 标准 .tb-btn padding 7/6→12/10 + min-height 52px + 字号 19/11→20/12；基础 td.nv padding 10→14、字号 13→14。两版可点区向上扩约 1/3
+· 已发布 2.4.9/code26，链接不变。测试跳过（用户明说 APK 改完不用测）

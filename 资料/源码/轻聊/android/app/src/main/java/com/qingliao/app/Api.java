@@ -173,12 +173,15 @@ public class Api {
 
     public static class User {
         public String id = "", username = "", nickname = "", initial = "", avatarColor = "";
+        /** 真实头像的相对路径（/api/avatars/<id>?v=N），没传过头像时为空 */
+        public String avatar = "";
         public boolean founder, master;
     }
 
     /** 好友（用于私聊入口）。私聊不是房间，单独走这里，不进房间列表。 */
     public static class Friend {
         public String id = "", username = "", nickname = "", initial = "", avatarColor = "";
+        public String avatar = "";
     }
 
     public static class Room {
@@ -197,6 +200,8 @@ public class Api {
     public static class Message {
         public String id = "", roomId = "", kind = "text", content = "";
         public String senderId = "", senderName = "";
+        /** 发送者头像相对路径（/api/avatars/<id>?v=N），没传过头像时为空 */
+        public String senderAvatar = "";
         public long createdAt, seq, rev;
         public boolean mine, recalled, canRecall, senderFounder, hasFile;
         public MsgFile file;
@@ -218,6 +223,7 @@ public class Api {
         u.nickname = o.optString("nickname", u.username);
         u.initial = o.optString("initial", "");
         u.avatarColor = o.optString("avatarColor", "");
+        u.avatar = o.optString("avatar", "");
         u.founder = o.optBoolean("founder", false);
         u.master = o.optBoolean("master", false);
         if (u.initial.length() == 0 && u.nickname.length() > 0) {
@@ -250,6 +256,7 @@ public class Api {
         m.content = o.optString("content", "");
         m.senderId = o.optString("senderId", "");
         m.senderName = o.optString("senderName", "");
+        m.senderAvatar = o.optString("senderAvatar", "");
         m.createdAt = o.optLong("createdAt", 0);
         m.seq = o.optLong("seq", 0);
         m.rev = o.optLong("rev", 0);
@@ -369,6 +376,7 @@ public class Api {
                 f.nickname = o.optString("nickname", f.username);
                 f.initial = o.optString("initial", "");
                 f.avatarColor = o.optString("avatarColor", "");
+                f.avatar = o.optString("avatar", "");
                 out.add(f);
             }
         }

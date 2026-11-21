@@ -40,6 +40,7 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
     private Store store;
     private Api api;
     private MsgAdapter adapter;
+    private AvatarLoader avatars;
 
     private List<Api.Room> rooms = new ArrayList<Api.Room>();
     private String roomId = "";
@@ -83,7 +84,8 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
         btnSend = (Button) findViewById(R.id.btnSend);
         list = (ListView) findViewById(R.id.list);
 
-        adapter = new MsgAdapter(this, this);
+        avatars = new AvatarLoader(api, 96);
+        adapter = new MsgAdapter(this, this, avatars);
         list.setAdapter(adapter);
 
         btnRooms.setOnClickListener(new View.OnClickListener() {

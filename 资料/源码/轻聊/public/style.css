@@ -291,9 +291,9 @@ option { background: var(--surface); color: var(--fg); }
   display: flex; background: var(--tabbar-bg); border-top: 1px solid var(--border); flex: 0 0 auto;
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
-.tb-btn { flex: 1; padding: 7px 0 6px; text-align: center; color: var(--fg-3); }
-.tb-btn .ic { display: block; font-size: 19px; line-height: 1.3; }
-.tb-btn .lb { display: block; font-size: 11px; }
+.tb-btn { flex: 1; padding: 12px 0 10px; text-align: center; color: var(--fg-3); min-height: 52px; }
+.tb-btn .ic { display: block; font-size: 20px; line-height: 1.3; }
+.tb-btn .lb { display: block; font-size: 12px; }
 .tb-btn.active { color: var(--accent); }
 
 /* ---------------- 列表视图 ---------------- */

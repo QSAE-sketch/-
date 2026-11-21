@@ -1,12 +1,15 @@
 package com.qingliao.app;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.drawable.GradientDrawable;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -31,14 +34,16 @@ public class MsgAdapter extends BaseAdapter {
     private final LayoutInflater inflater;
     private final List<Api.Message> data = new ArrayList<Api.Message>();
     private final Listener listener;
+    private final AvatarLoader avatars;
     private int maxBubbleWidth;
 
     /** 上一条消息的发送者：用来合并连续消息的昵称与头像 */
     private final List<Boolean> showHeader = new ArrayList<Boolean>();
 
-    public MsgAdapter(Context ctx, Listener l) {
+    public MsgAdapter(Context ctx, Listener l, AvatarLoader avatarLoader) {
         inflater = LayoutInflater.from(ctx);
         listener = l;
+        avatars = avatarLoader;
         int screen = ctx.getResources().getDisplayMetrics().widthPixels;
         maxBubbleWidth = (int) (screen * 0.70f);
     }
@@ -133,7 +138,9 @@ public class MsgAdapter extends BaseAdapter {
             v = inflater.inflate(R.layout.item_msg_other, parent, false);
             v.setTag(Integer.valueOf(TYPE_OTHER));
         }
+        FrameLayout avatarBox = (FrameLayout) v.findViewById(R.id.avatarBox);
         TextView avatar = (TextView) v.findViewById(R.id.avatar);
+        final ImageView avatarImg = (ImageView) v.findViewById(R.id.avatarImg);
         TextView name = (TextView) v.findViewById(R.id.tvName);
         TextView bubble = (TextView) v.findViewById(R.id.bubble);
 
@@ -141,7 +148,7 @@ public class MsgAdapter extends BaseAdapter {
         String nick = TextUtils.isEmpty(m.senderName) ? "?" : m.senderName;
 
         if (show) {
-            avatar.setVisibility(View.VISIBLE);
+            avatarBox.setVisibility(View.VISIBLE);
             name.setVisibility(View.VISIBLE);
             avatar.setText(nick.substring(0, Math.min(2, nick.length())));
             name.setText(nick);
@@ -155,9 +162,35 @@ public class MsgAdapter extends BaseAdapter {
             GradientDrawable g = new GradientDrawable();
             g.setShape(GradientDrawable.OVAL);
             g.setColor(android.graphics.Color.HSVToColor(hsv));
-            avatar.setBackgroundDrawable(g);
+            avatarBox.setBackgroundDrawable(g);
+            avatar.setBackgroundDrawable(null);
+            avatar.setTextColor(0xFFFFFFFF);
+
+            /* 真实头像：缓存命中立刻盖上去，没命中就后台下好再刷（失败保持色块+首字） */
+            String av = m.senderAvatar;
+            avatarImg.setTag(av == null ? "" : av);
+            Bitmap hit = (avatars == null || av == null || av.length() == 0) ? null : avatars.peek(av);
+            if (hit != null) {
+                avatarImg.setImageBitmap(hit);
+                avatarImg.setVisibility(View.VISIBLE);
+            } else {
+                avatarImg.setImageDrawable(null);
+                avatarImg.setVisibility(View.GONE);
+                if (avatars != null && av != null && av.length() > 0) {
+                    final String want = av;
+                    avatars.load(want, new AvatarLoader.Callback() {
+                        public void onLoaded(String path, Bitmap bmp) {
+                            // 复用行可能已经被滚去别的消息了，url 对上才画，防错位
+                            if (path.equals(avatarImg.getTag())) {
+                                avatarImg.setImageBitmap(bmp);
+                                avatarImg.setVisibility(View.VISIBLE);
+                            }
+                        }
+                    });
+                }
+            }
         } else {
-            avatar.setVisibility(View.INVISIBLE);
+            avatarBox.setVisibility(View.INVISIBLE);
             name.setVisibility(View.GONE);
         }
 
