@@ -1185,6 +1185,29 @@
     });
   }
 
+  /** 历史更新记录：读取服务端 /api/version 里的 changelog（只存一份、默认不显示），点开才渲染 */
+  function showChangelog() {
+    var v = S.version || {};
+    var cl = v.changelog || {};
+    var list = cl.releases || [];
+    if (!list.length) { toast('暂无更新记录'); return; }
+    var h = '<div style="max-height:52vh;overflow:auto;font-size:13px;line-height:1.7">';
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      h += '<div style="padding:9px 0;border-bottom:1px solid var(--border-2)">' +
+        '<div style="font-weight:600;color:var(--accent)">v' + esc(r.version) +
+        ' <span style="font-weight:400;color:var(--fg-3)">· ' + esc(r.date || '') +
+        (r.code ? ' · code ' + esc(r.code) : '') + '</span></div>';
+      var ch = r.changes || [];
+      for (var j = 0; j < ch.length; j++) {
+        h += '<div style="color:var(--fg-2);padding-left:12px;margin-top:3px">· ' + esc(ch[j]) + '</div>';
+      }
+      h += '</div>';
+    }
+    h += '</div>';
+    openModal('历史更新记录', h, null, '关闭');
+  }
+
   function renderMe() {
     var h = '<div class="card"><div class="card-h">账号信息</div>' +
       '<div class="row me-av-row"><div class="me-av" id="myAvatar"></div>' +
@@ -1240,6 +1263,12 @@
       '· 单文件上限 200MB，分片上传 + 断点续传<br>' +
       '· 删除 = 仅对自己隐藏；撤回 = 发送者 2 分钟内，彻底移除<br>' +
       '· 直接删除 = 无时间限制，服务器端彻底清除，所有设备同步消失</div></div>';
+    h += '<div class="card"><div class="act" id="viewChangelog">📜 历史更新记录 · 查看每个版本新增与修复</div></div>';
+    h += '<div class="card"><div class="card-h">开发者联系方式</div>' +
+      '<div class="r-sub" style="padding:11px 13px;white-space:normal">' +
+      '反馈问题或建议请发邮件给开发者：<br>' +
+      '<a href="mailto:' + esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '">' +
+      esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '</a></div></div>';
     h += '<div class="card"><div class="act" data-go="settings">⚙️ 设置 · 缓存 / 聊天记录 / 下载路径</div></div>';
     h += '<div class="card"><div class="act" data-go="settings">🎨 外观 · 当前主题：' + themeLabel() + '</div></div>';
     h += '<div class="card"><div class="act danger" id="logout">退出登录</div></div>';
@@ -1247,6 +1276,8 @@
     $('view').innerHTML = h;
     var setEntry = $('view').querySelector('[data-go="settings"]');
     if (setEntry) setEntry.onclick = function () { openSettings(); };
+    var clEntry = $('viewChangelog');
+    if (clEntry) clEntry.onclick = showChangelog;
     bind('editNick', doChangeNickname);
     bind('changeAvatar', doChangeAvatar);
     renderMyAvatar();

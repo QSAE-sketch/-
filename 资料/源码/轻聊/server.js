@@ -33,6 +33,7 @@ const ROOT = __dirname;
 const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const VERSION_FILE = path.join(ROOT, 'version.json');
+const CHANGELOG_FILE = path.join(__dirname, 'changelog.json');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const AVATAR_DIR = path.join(DATA_DIR, 'avatars');
 const CHUNK_SIZE = 4 * 1024 * 1024;          // 4MB/片，200MB → 50 片
@@ -953,6 +954,20 @@ function readVersion() {
   }
 }
 
+/** 版本更新历史（存一份在 changelog.json，默认不在界面显示，仅在「历史更新记录」里查看） */
+function readChangelog() {
+  try {
+    const d = JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
+    return {
+      app: String(d.app || '轻聊'),
+      contact: String(d.contact || ''),
+      releases: Array.isArray(d.releases) ? d.releases : []
+    };
+  } catch (e) {
+    return { app: '轻聊', contact: '', releases: [] };
+  }
+}
+
 /**
  * 构建指纹：version.json + app.js + style.css 的内容一起算。
  * 只要部署过任何改动，这个值就变 —— 即使忘了手动改 version.json 的语义版本号，
@@ -978,8 +993,12 @@ function buildId() {
 
 // 无需登录：设置页、登录页都能查询；不含任何用户数据
 route('GET', '/api/version', async (req, res) => {
+  const changelog = readChangelog();
   ok(res, {
     version: readVersion(),
+    // 历史更新记录：只存一份、默认不显示；前端「历史更新记录」按钮点开才渲染
+    changelog: changelog,
+    contact: changelog.contact,
     build: buildId(),
     serverTime: now(),
     // 内置云网盘（不再是独立应用，前端据此显示「网盘」入口）

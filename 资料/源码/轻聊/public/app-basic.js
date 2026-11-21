@@ -807,7 +807,11 @@
     h += '<div class="card"><div class="ch">关于</div><div class="cb">' +
       '<div class="ls">版本：' + esc(S.version && S.version.version ? S.version.version.name : '—') +
       '（基础版 · 兼容模式）</div>' +
-      '<div style="margin-top:8px">' +
+      '<div style="margin-top:8px"><button class="bt sm bg" onclick="LL.showChangelog()">历史更新记录</button></div>' +
+      '<div class="ls" style="margin-top:9px;line-height:1.6">反馈问题请发邮件给开发者：<br>' +
+      '<a href="mailto:' + esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '">' +
+      esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '</a></div>' +
+      '<div style="margin-top:9px">' +
       '<button class="bt sm bg" onclick="LL.logout()">退出登录</button> ' +
       '<button class="bt sm bd2" onclick="LL.deleteAccount()">注销账号</button>' +
       '</div></div></div>';
@@ -815,6 +819,31 @@
     $('view').innerHTML = h;
     if (!S.storage) loadStorage(function () { if (S.view === 'me') renderMe(); });
   }
+
+  /** 历史更新记录：内联视图展示（基础版不用遮罩），数据来自 /api/version，只存一份默认不显示 */
+  LL.showChangelog = function () {
+    var v = S.version || {};
+    var list = (v.changelog && v.changelog.releases) || [];
+    if (!list.length) { alert('暂无更新记录'); return; }
+    var h = '<div class="card"><div class="ch">历史更新记录</div><div class="cb">';
+    h += '<div class="ls" style="margin-bottom:8px">当前版本：v' +
+      esc(v.version ? v.version.name : '—') + '（code ' + (v.version ? v.version.code : '—') + '）</div>';
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      h += '<div style="padding:8px 0;border-bottom:1px solid #edf0f4">';
+      h += '<div class="lt" style="color:#1a5fd0">v' + esc(r.version) +
+        ' <span class="ls">' + esc(r.date || '') + (r.code ? ' · code ' + esc(r.code) : '') + '</span></div>';
+      var ch = r.changes || [];
+      for (var j = 0; j < ch.length; j++) {
+        h += '<div class="ls" style="margin-top:3px;line-height:1.5">· ' + esc(ch[j]) + '</div>';
+      }
+      h += '</div>';
+    }
+    h += '<div style="margin-top:10px"><button class="bt bg" onclick="LL.go(\'me\')">返回</button></div>';
+    h += '</div></div>';
+    $('view').innerHTML = h;
+    try { window.scrollTo(0, 0); } catch (e) { }
+  };
 
   LL.editNick = function () {
     var v = window.prompt('修改昵称（2-20 位中英文 / 数字 / 下划线）：', S.user ? (S.user.nickname || '') : '');
