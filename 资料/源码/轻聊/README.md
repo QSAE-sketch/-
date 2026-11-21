@@ -654,6 +654,14 @@ version.json（项目根目录，唯一来源）
 
 `GET /api/version` 无需登录、不含任何用户数据；响应里的 `serverTime` 是服务端当前时间。
 
+### 每次更新必做（维护约定）
+
+**每次版本更新，除了改 `version.json`，必须同步往 `changelog.json` 的 `releases`
+数组开头追加一条记录**（版本号 / code / 日期 / changes 列表：本次新增了什么、修了什么 bug）。
+应用内「我的 / 关于 → 历史更新记录」按钮读的就是这份文件——它是唯一数据源，
+只存一份、平时不显示，漏加就等于用户在更新记录里看不到这一版。
+`changelog.json` 里的 `contact` 字段是开发者联系邮箱（显示在设置/关于页）。
+
 > 构建指纹用固定的相对标签（`version.json` / `public/app.js` / `public/style.css`）参与哈希，
 > 不用 `path.relative()` —— Windows 是反斜杠、Linux 是正斜杠，会让同一份代码算出不同构建号。
 
