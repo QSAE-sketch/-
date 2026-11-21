@@ -374,11 +374,8 @@
     setText($('hdTitle'), TITLES[v] || '轻聊');
 
     if (v === 'public') {
-      if (!S.publicRoomId) {
-        loadRooms(function () { LL.openRoom(S.publicRoomId); });
-      } else {
-        LL.openRoom(S.publicRoomId);
-      }
+      // 公共 tab 显示入口页（公共聊天室卡片 + 公告 + 提示），点卡片才进聊天室
+      loadRooms(renderPublic);
       return;
     }
     if (v === 'rooms') { loadRooms(renderRooms); return; }
@@ -410,6 +407,44 @@
       S.publicRoomId = d.publicRoomId || '';
       if (cb) cb(null);
     });
+  }
+
+  /** 官方公告：有内容才显示，空则完全不出现（数据来自 /api/version.announcement） */
+  function announcementHtml() {
+    var a = (S.version && S.version.announcement) || {};
+    if (!a.enabled || !(a.content || a.title)) return '';
+    return '<div class="card"><div class="ch">📢 ' +
+      (a.title ? esc(a.title) : '官方公告') + '</div><div class="cb">' +
+      '<div class="ls" style="line-height:1.6;white-space:pre-wrap">' + esc(a.content) +
+      '</div></div></div>';
+  }
+
+  /** 公共 tab 入口页：公共聊天室卡片 → 公告位 → 提示卡片（点卡片才进聊天室） */
+  function renderPublic() {
+    var pub = null;
+    for (var i = 0; i < S.rooms.length; i++) {
+      if (S.rooms[i].kind === 'public') { pub = S.rooms[i]; break; }
+    }
+    var h = '';
+    if (!pub) {
+      h += '<div class="card"><div class="cb"><div class="empty">加载中…</div></div></div>';
+    } else {
+      h += '<div class="card"><div class="cb">' +
+        '<div class="lt" style="color:#1a5fd0">🌍 ' + esc(pub.name) + '</div>' +
+        '<div class="ls" style="margin-top:3px">' + num(pub.memberCount) +
+        ' 人在线 · 所有登录用户均可发言</div>' +
+        '<div style="margin-top:8px"><button class="bt bp" onclick="LL.openRoom(\'' +
+        esc(pub.id) + '\')">进入公共聊天室</button></div>' +
+        '</div></div>';
+      h += announcementHtml();
+      h += '<div class="card"><div class="ch">💡 提示</div><div class="cb">' +
+        '<div class="ls" style="line-height:1.7">' +
+        '公共聊天室对所有登录用户开放，无需加入即可发言。<br>' +
+        '单文件上限 4MB（标准版 200MB，可切换版本上传更大文件）。<br>' +
+        '消息发送后 2 分钟内可撤回；删除仅对自己隐藏；直接删除可彻底清除。</div>' +
+        '</div></div>';
+    }
+    $('view').innerHTML = h;
   }
 
   function renderRooms() {
@@ -1467,7 +1502,10 @@
     /* ③ 版本信息（公开接口，失败也无所谓） */
     step('version', function () {
       api('GET', '/api/version', null, function (err, d) {
-        if (!err && d) S.version = d;
+        if (!err && d) {
+          S.version = d;
+          if (S.view === 'public' && S.rooms.length) renderPublic();  // 公告到位后刷新公共入口页
+        }
       });
     });
 

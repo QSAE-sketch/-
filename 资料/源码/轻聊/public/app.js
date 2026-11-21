@@ -779,6 +779,7 @@
       var had = !!S.version;
       S.version = d;
       if (!had && S.view === 'me') renderMe();
+      if (S.view === 'public' && S.rooms.length) renderPublic();  // 公告到位后刷新公共入口页
     });
     loadStorage();
     loadRooms();
@@ -854,6 +855,17 @@
 
   /* ---------------- 视图：公共聊天室 ---------------- */
 
+  /** 官方公告卡片：有内容才显示，空则完全不出现（数据来自 /api/version.announcement） */
+  function announcementHtml() {
+    var a = (S.version && S.version.announcement) || {};
+    if (!a.enabled || !(a.content || a.title)) return '';
+    var h = '<div class="card"><div class="card-h">📢 ' +
+      (a.title ? esc(a.title) : '官方公告') + '</div>' +
+      '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.7;white-space:pre-wrap">' +
+      esc(a.content) + '</div></div>';
+    return h;
+  }
+
   function renderPublic() {
     var h = '';
     var pub = null;
@@ -868,6 +880,7 @@
         '<span class="badge">全员可发言</span></div>' +
         '<div class="r-sub">' + pub.memberCount + ' 人在线加入 · 所有登录用户均可发送文字/图片/视频/文件</div></div>' +
         '<span style="color:#8b949e">›</span></div></div>';
+      h += announcementHtml();
       h += '<div class="card"><div class="card-h">💡 提示</div>' +
         '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.7">' +
         '公共聊天室对所有登录用户开放，无需加入即可发言。<br>' +

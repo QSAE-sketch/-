@@ -91,3 +91,10 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 修正 changelog 中 2.4.1/2.4.2 的错误默认视图描述，追加 2.4.3，共 14 版
 · 用户强调：每次版本更新都要同步往 changelog 追加条目 → 已写进 README「每次更新必做」维护约定
 · 清测试留痕；全量 760/0；版本 2.4.3/code 20
+
+— 2026-11-21　v2.4.4 公共页公告位 + 基础版公共tab改入口页
+· 用户问：基础版公共tab为何一点就进聊天室、私聊为何算房间、基础版看不到提示；澄清后把基础版 public 从直接 openRoom 改为入口页(renderPublic)：公共聊天室卡片→公告位→提示，点卡片才进房
+· 私聊算房间是数据模型设计(ROOM_DM 用房间实现，GET /api/dm/:userId 建/取)，非 bug，未改
+· 新增 announcement.json(默认空) + /api/version.announcement；两版公共页在公共卡片与提示之间加官方公告位，有内容才显示空则隐藏；version 回调加公共页刷新
+· 以后加公告：编辑 announcement.json 的 enabled/title/content 即可（存一份）
+· 版本 2.4.4/code 21，changelog 15版；全量760/0；截图实测公告位顺序与显隐正确
