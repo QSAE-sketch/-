@@ -62,3 +62,4 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
   与「改用低配版」等提示；版本 2.3.0/code 16；room-features/cache 测试改统一基础版语义，全量 797/0
 · 验证：发布后 红米 Note 2 UA + 无头 Chrome 渲染登录页完整（输入框/登录按钮/设备自检齐全），
   页面+JS+CSS+API 全链路 200；分享链接 https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A
+· 2026-11-21 补：登录页数据互通说明提示补回（措辞改为「电脑和手机完全互通」，不再提已删除的版本切换）
