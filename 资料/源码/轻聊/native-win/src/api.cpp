@@ -319,6 +319,37 @@ void Api::logout() {
 
 /* ---- 房间 ---- */
 
+bool Api::fetchFriends(std::vector<Friend>& out) {
+    HttpResponse r = http_.get("/api/friends");
+    Json j;
+    if (!parseOk(r, j)) return false;
+    out.clear();
+    const Json* arr = j.find("friends");
+    if (arr && arr->isArray()) {
+        for (size_t i = 0; i < arr->items.size(); ++i) {
+            const Json& o = arr->items[i];
+            Friend f;
+            f.id = o.str("id");
+            f.username = o.str("username");
+            f.nickname = o.str("nickname");
+            if (f.nickname.empty()) f.nickname = f.username;
+            f.initial = o.str("initial");
+            f.avatarColor = o.str("avatarColor");
+            out.push_back(f);
+        }
+    }
+    return true;
+}
+
+bool Api::openDm(const std::string& userId, Room& out) {
+    HttpResponse r = http_.get("/api/dm/" + userId);
+    Json j;
+    if (!parseOk(r, j)) return false;
+    const Json* room = j.find("room");
+    if (room) out = parseRoom(*room);
+    return true;
+}
+
 bool Api::fetchRooms(std::vector<Room>& out, std::string& publicRoomId) {
     HttpResponse r = http_.get("/api/rooms");
     Json j;

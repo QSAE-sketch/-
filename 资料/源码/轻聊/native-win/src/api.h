@@ -29,6 +29,11 @@ struct Member {
     Member() : mutedUntil(0), founder(false) {}
 };
 
+/* 好友（仅用于私聊入口；私聊不是房间，不进房间列表） */
+struct Friend {
+    std::string id, username, nickname, initial, avatarColor;
+};
+
 struct Room {
     std::string id, kind, name, role, roleName;
     int memberCount;
@@ -111,6 +116,10 @@ public:
     bool clearAvatar();
     bool downloadAvatar(const std::string& urlPath, std::vector<unsigned char>& out);
     void logout();
+
+    /* ---- 好友 / 私聊（私聊不是房间，单列） ---- */
+    bool fetchFriends(std::vector<Friend>& out);
+    bool openDm(const std::string& userId, Room& out);
 
     /* ---- 房间 ---- */
     bool fetchRooms(std::vector<Room>& out, std::string& publicRoomId);

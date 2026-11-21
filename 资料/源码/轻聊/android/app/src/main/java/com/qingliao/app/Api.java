@@ -176,6 +176,11 @@ public class Api {
         public boolean founder, master;
     }
 
+    /** 好友（用于私聊入口）。私聊不是房间，单独走这里，不进房间列表。 */
+    public static class Friend {
+        public String id = "", username = "", nickname = "", initial = "", avatarColor = "";
+    }
+
     public static class Room {
         public String id = "", kind = "", name = "", role = "", roleName = "";
         public int memberCount;
@@ -347,6 +352,33 @@ public class Api {
             }
         }
         return out;
+    }
+
+    /** 我的好友列表（只用于发起私聊，不是房间）。 */
+    public List<Friend> friends() throws ApiException {
+        JSONObject j = unwrap(get("/api/friends"));
+        List<Friend> out = new ArrayList<Friend>();
+        JSONArray arr = j.optJSONArray("friends");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                Friend f = new Friend();
+                f.id = o.optString("id", "");
+                f.username = o.optString("username", "");
+                f.nickname = o.optString("nickname", f.username);
+                f.initial = o.optString("initial", "");
+                f.avatarColor = o.optString("avatarColor", "");
+                out.add(f);
+            }
+        }
+        return out;
+    }
+
+    /** 打开/获取与某个好友的私聊（服务端按 pairKey 复用同一条会话）。 */
+    public Room dm(String userId) throws ApiException {
+        JSONObject j = unwrap(get("/api/dm/" + userId));
+        return parseRoom(j.optJSONObject("room"));
     }
 
     public Room createRoom(String name, String password) throws ApiException {

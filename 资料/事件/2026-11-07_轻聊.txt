@@ -109,3 +109,14 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 修复上轮好友横条改版遗留 bug：标准版缺 num() 定义、api() 空回调崩溃、弹窗点头像未收起遮挡资料页、测试仍按旧列表结构断言 → 已全部修复并更新 ui.js 测试
 · 隐私实测 15/0：房间列表无 dm、陌生人/最高权限不能读私聊、dm/list 只返本人、搜索不泄露；全量 765/0
 · 版本 2.4.5/code 22，changelog 16 版；源码已同步 资料/源码/轻聊/
+
+— 2026-11-21　v2.4.6 原生客户端同步私聊（APK/exe 不再是壳）
+· 用户问「APK 和 EVE 更新了吗？做那种原生版本的，不只是套个壳」。核查：根目录 轻聊.exe(685KB) / 轻聊.apk(121KB) 本来就是真原生
+  （Windows C++ Win32+GDI 自绘、Android Java 原生 Activity），不是 WebView/Electron；但停在 11-14，缺好友/私聊功能
+· Windows 原生（native-win/）：侧栏顶部加「房间 / 好友」两个 tab；房间栏过滤 kind=dm；好友栏列好友(昵称+首字头像)，点一下 /api/dm 进私聊；
+  好友模式底部按钮变「刷新好友 / ← 房间」；api 新增 fetchFriends/openDm；AsyncResult 加 RK_FRIENDS/RK_DM；点击索引起点随 tab 改到 116
+· Android 原生（android/）：Api 加 Friend 类 + friends()/dm()；☰ 改为「选择聊天」（公共+群聊+最底部「👤 好友私聊…」）；新增 showFriendDms/openDm
+· 构建坑：本机只有 JDK22(class 66)，Gradle 8.7/AGP 8.5.2 不认 → 从清华镜像装 Temurin JDK17 到 D://jdk17，用 JAVA_HOME 指向它编译成功
+· 产物：轻聊.apk versionCode=23/versionName=2.4.6（121557B）；轻聊.exe 685568B，仅依赖系统 DLL(COMCTL32/GDI32/WINHTTP/msvcrt 等)；
+  旧壳 android/api19-Browser.apk 移到 dist/archive/（dist 已被 gitignore），根目录只留原生产物
+· 验证：APK dex 含「好友私聊」+「/api/dm/」；exe 含「点击发私聊」「刷新好友」；全量 765/0；线上已发布 2.4.6/code23，链接不变

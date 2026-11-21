@@ -104,6 +104,7 @@ struct AsyncResult {
     std::vector<unsigned char> bytes;   // RK_AVATAR_GET：头像字节
     std::vector<RoomSearchItem> searchResults;  // RK_SEARCH
     Room room;                          // RK_SEARCH_PEEK / RK_SEARCH_JOIN：要打开的房间
+    std::vector<Friend> friends;        // RK_FRIENDS
     AsyncResult() : kind(0), ok(false) {}
 };
 
@@ -112,7 +113,8 @@ enum ResKind {
     RK_UPLOAD, RK_DOWNLOAD, RK_NICK, RK_JOIN, RK_CREATE, RK_VERSION, RK_MEMBERS,
     RK_MEMBERINFOS, RK_MUTE, RK_KICK, RK_APPOINT, RK_TRANSFER, RK_DISSOLVE,
     RK_AVATAR_SET, RK_AVATAR_CLEAR, RK_AVATAR_GET,
-    RK_SEARCH, RK_SEARCH_PEEK, RK_SEARCH_JOIN
+    RK_SEARCH, RK_SEARCH_PEEK, RK_SEARCH_JOIN,
+    RK_FRIENDS, RK_DM
 };
 
 static HINSTANCE g_inst = NULL;
@@ -123,6 +125,10 @@ static View g_view = VIEW_LOGIN;
 static bool g_registerMode = false;
 
 static std::vector<Room> g_rooms;
+static std::vector<Friend> g_friends;   // 好友（私聊入口，不算房间）
+static int g_sideMode = 0;              // 0=房间列表 1=好友列表
+static int g_hoverFriend = -1;
+static RECT g_btnTabRooms, g_btnTabFriends;
 static std::string g_publicRoomId;
 static std::string g_roomId;
 static std::string g_roomName;
@@ -642,6 +648,31 @@ static void loadRooms() {
         r->kind = RK_ROOMS;
         r->ok = g_api.fetchRooms(r->rooms, r->publicId);
         r->error = g_api.lastError();
+        deliver(r);
+    });
+}
+
+static void loadFriends() {
+    postJob([]() {
+        AsyncResult* r = new AsyncResult();
+        r->kind = RK_FRIENDS;
+        r->ok = g_api.fetchFriends(r->friends);
+        r->error = g_api.lastError();
+        deliver(r);
+    });
+}
+
+/** 点头像/好友 → 打开与他的私聊（私聊不是房间，服务端按 pairKey 复用会话） */
+static void openDmAsync(const Friend& f) {
+    std::string uid = f.id;
+    std::string nick = f.nickname;
+    setStatus(L"正在打开私聊…");
+    postJob([uid, nick]() {
+        AsyncResult* r = new AsyncResult();
+        r->kind = RK_DM;
+        r->ok = g_api.openDm(uid, r->room);
+        r->error = g_api.lastError();
+        r->text = nick;
         deliver(r);
     });
 }
@@ -1176,81 +1207,143 @@ static void paintSidebar(HDC dc, const RECT& side) {
     RECT line = {0, 68, side.right, 69};
     fillRect(dc, line, C_LINE);
 
-    /* 房间列表 */
-    int y = 78;
-    int itemH = 56;
-    RECT listClip = {0, 70, side.right, side.bottom - 56};
-    HRGN clip = CreateRectRgn(listClip.left, listClip.top, listClip.right, listClip.bottom);
-    SelectClipRgn(dc, clip);
-
-    g_hoverRoom = -1;
     POINT pt;
     GetCursorPos(&pt);
     ScreenToClient(g_hwnd, &pt);
 
-    for (size_t i = 0; i < g_rooms.size(); ++i) {
-        const Room& r = g_rooms[i];
-        RECT it = {0, y, side.right, y + itemH};
-        if (it.top > listClip.bottom) break;
-
-        bool active = (r.id == g_roomId);
-        if (active) {
-            fillRect(dc, it, C_ACTIVE);
-        } else if (inRect(it, pt.x, pt.y)) {
-            fillRect(dc, it, C_HOVER);
-            g_hoverRoom = (int)i;
-        }
-
-        /* 房间头像：公共大厅用蓝色，群用灰蓝 */
-        int sz = 34;
-        RECT av2 = {16, y + 11, 16 + sz, y + 11 + sz};
-        COLORREF rc2 = (r.kind == "public") ? C_ACCENT : RGB(120, 132, 148);
-        if (r.id == g_roomId) rc2 = C_ACCENT;
-        roundRect(dc, av2, 8, rc2, rc2);
-        std::wstring inis = L"#";
-        if (r.kind == "dm") inis = L"私";
-        else if (r.kind == "public") inis = L"公";
-        textOut(dc, inis, av2, RGB(255, 255, 255), g_fontSmall,
+    /* 房间 / 好友 两个 tab：私聊不是房间，只在「好友」里出现 */
+    int ty = 76;
+    int tabH = 32;
+    int tabW = (side.right - 24) / 2;
+    g_btnTabRooms = RECT{12, ty, 12 + tabW, ty + tabH};
+    g_btnTabFriends = RECT{16 + tabW, ty, side.right - 12, ty + tabH};
+    {
+        bool on1 = (g_sideMode == 0);
+        roundRect(dc, g_btnTabRooms, 8, on1 ? C_ACCENT_DIM : C_CARD, on1 ? C_ACCENT : C_LINE);
+        textOut(dc, L"房间", g_btnTabRooms, on1 ? C_ACCENT : C_SUB, g_fontSmall,
                 DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        bool on2 = (g_sideMode == 1);
+        roundRect(dc, g_btnTabFriends, 8, on2 ? C_ACCENT_DIM : C_CARD, on2 ? C_ACCENT : C_LINE);
+        textOut(dc, L"好友", g_btnTabFriends, on2 ? C_ACCENT : C_SUB, g_fontSmall,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
 
-        RECT rn = {16 + sz + 10, y + 10, side.right - 58, y + 34};
-        textOut(dc, wide(r.name), rn, C_TEXT, g_fontUI,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+    int y = ty + tabH + 8;
+    int itemH = 56;
+    RECT listClip = {0, y - 4, side.right, side.bottom - 56};
+    HRGN clip = CreateRectRgn(listClip.left, listClip.top, listClip.right, listClip.bottom);
+    SelectClipRgn(dc, clip);
 
-        std::wstring sub;
-        if (r.dissolved) sub = L"已解散";
-        else if (r.kind == "public") sub = L"所有人在此";
-        else {
-            wchar_t b[48];
-            swprintf(b, 48, L"%d 人", r.memberCount);
-            sub = b;
+    g_hoverRoom = -1;
+    g_hoverFriend = -1;
+
+    if (g_sideMode == 1) {
+        /* ---- 好友列表：点一下进入私聊（不是房间） ---- */
+        if (g_friends.empty()) {
+            textOut(dc, L"还没有好友，先在网页版「好友」里添加",
+                    RECT{16, y + 14, side.right - 16, y + 44}, C_MUTED, g_fontSmall,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER);
         }
-        if (r.hasPassword) sub += L" · 🔒";
-        RECT rs = {16 + sz + 10, y + 32, side.right - 16, y + 52};
-        textOut(dc, sub, rs, C_MUTED, g_fontSmall,
-                DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+        for (size_t i = 0; i < g_friends.size(); ++i) {
+            const Friend& f = g_friends[i];
+            RECT it = {0, y, side.right, y + itemH};
+            if (it.top > listClip.bottom) break;
+            if (inRect(it, pt.x, pt.y)) { fillRect(dc, it, C_HOVER); g_hoverFriend = (int)i; }
 
-        /* 人数徽标 */
-        y += itemH;
+            int sz = 34;
+            RECT av2 = {16, y + 11, 16 + sz, y + 11 + sz};
+            COLORREF rc2 = parseHsl(f.avatarColor.empty() ? std::string("#5b8def") : f.avatarColor);
+            roundRect(dc, av2, 17, rc2, rc2);
+            std::wstring ini = wide(f.initial);
+            if (ini.empty()) {
+                ini = wide(f.nickname);
+                if (!ini.empty()) ini = ini.substr(0, 1);
+                else ini = L"?";
+            }
+            textOut(dc, ini, av2, RGB(255, 255, 255), g_fontSmall,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+
+            textOut(dc, wide(f.nickname), RECT{16 + sz + 10, y + 10, side.right - 16, y + 34},
+                    C_TEXT, g_fontUI, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            textOut(dc, L"点击发私聊", RECT{16 + sz + 10, y + 32, side.right - 16, y + 52},
+                    C_MUTED, g_fontSmall, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+            y += itemH;
+        }
+    } else {
+        /* ---- 房间列表（私聊不在其中） ---- */
+        for (size_t i = 0; i < g_rooms.size(); ++i) {
+            const Room& r = g_rooms[i];
+            if (r.kind == "dm") continue;   // 双保险：私聊不是房间
+            RECT it = {0, y, side.right, y + itemH};
+            if (it.top > listClip.bottom) break;
+
+            bool active = (r.id == g_roomId);
+            if (active) {
+                fillRect(dc, it, C_ACTIVE);
+            } else if (inRect(it, pt.x, pt.y)) {
+                fillRect(dc, it, C_HOVER);
+                g_hoverRoom = (int)i;
+            }
+
+            /* 房间头像：公共大厅用蓝色，群用灰蓝 */
+            int sz = 34;
+            RECT av2 = {16, y + 11, 16 + sz, y + 11 + sz};
+            COLORREF rc2 = (r.kind == "public") ? C_ACCENT : RGB(120, 132, 148);
+            if (r.id == g_roomId) rc2 = C_ACCENT;
+            roundRect(dc, av2, 8, rc2, rc2);
+            std::wstring inis = L"#";
+            if (r.kind == "public") inis = L"公";
+            textOut(dc, inis, av2, RGB(255, 255, 255), g_fontSmall,
+                    DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+
+            RECT rn = {16 + sz + 10, y + 10, side.right - 58, y + 34};
+            textOut(dc, wide(r.name), rn, C_TEXT, g_fontUI,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+
+            std::wstring sub;
+            if (r.dissolved) sub = L"已解散";
+            else if (r.kind == "public") sub = L"所有人在此";
+            else {
+                wchar_t b[48];
+                swprintf(b, 48, L"%d 人", r.memberCount);
+                sub = b;
+            }
+            if (r.hasPassword) sub += L" · 🔒";
+            RECT rs = {16 + sz + 10, y + 32, side.right - 16, y + 52};
+            textOut(dc, sub, rs, C_MUTED, g_fontSmall,
+                    DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_END_ELLIPSIS);
+
+            y += itemH;
+        }
     }
     SelectClipRgn(dc, NULL);
     DeleteObject(clip);
 
-    /* 底部两颗按钮：搜索房间 | 新建房间 */
+    /* 底部两颗按钮：房间模式=搜索/新建；好友模式=刷新/回房间 */
     int half = (side.right - 36) / 2;
     RECT sb = {12, side.bottom - 48, 12 + half, side.bottom - 12};
-    g_btnSearchRoom = sb;
-    bool hov = inRect(sb, pt.x, pt.y);
-    roundRect(dc, sb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
-    textOut(dc, L"搜索房间", sb, C_ACCENT, g_fontUI,
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
-
     RECT nb = {20 + half, side.bottom - 48, side.right - 12, side.bottom - 12};
+    g_btnSearchRoom = sb;
     g_btnNew = nb;
-    hov = inRect(nb, pt.x, pt.y);
-    roundRect(dc, nb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
-    textOut(dc, L"＋ 新建", nb, C_ACCENT, g_fontUI,
-            DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    if (g_sideMode == 1) {
+        bool hov = inRect(sb, pt.x, pt.y);
+        roundRect(dc, sb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
+        textOut(dc, L"刷新好友", sb, C_ACCENT, g_fontUI,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        hov = inRect(nb, pt.x, pt.y);
+        roundRect(dc, nb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
+        textOut(dc, L"← 房间", nb, C_ACCENT, g_fontUI,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    } else {
+        bool hov = inRect(sb, pt.x, pt.y);
+        roundRect(dc, sb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
+        textOut(dc, L"搜索房间", sb, C_ACCENT, g_fontUI,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+        hov = inRect(nb, pt.x, pt.y);
+        roundRect(dc, nb, 8, hov ? C_ACCENT_DIM : C_CARD, C_LINE);
+        textOut(dc, L"＋ 新建", nb, C_ACCENT, g_fontUI,
+                DT_CENTER | DT_SINGLELINE | DT_VCENTER);
+    }
 }
 
 static void paintChat(HDC dc, const RECT& chat) {
@@ -1549,9 +1642,32 @@ static void handleResult(AsyncResult* r) {
         }
         break;
 
+    case RK_FRIENDS:
+        if (r->ok) {
+            g_friends = r->friends;
+            setStatus(L"");
+        } else {
+            setStatus(L"加载好友失败：" + wide(r->error));
+        }
+        InvalidateRect(g_hwnd, NULL, FALSE);
+        break;
+
+    case RK_DM:
+        if (r->ok && !r->room.id.empty()) {
+            if (r->room.name.empty()) r->room.name = r->text;
+            openRoom(r->room);
+            setStatus(L"");
+        } else {
+            setStatus(L"打开私聊失败：" + wide(r->error.empty() ? "未知错误" : r->error));
+        }
+        break;
+
     case RK_ROOMS:
         if (r->ok) {
-            g_rooms = r->rooms;
+            /* 私聊不是房间：即便服务端将来误返，也在客户端剔除，保证列表/索引一致 */
+            g_rooms.clear();
+            for (size_t gi = 0; gi < r->rooms.size(); ++gi)
+                if (r->rooms[gi].kind != "dm") g_rooms.push_back(r->rooms[gi]);
             g_publicRoomId = r->publicId;
             if (g_roomId.empty() || !g_rooms.empty()) {
                 // 首次进入自动打开公共大厅
@@ -3095,18 +3211,34 @@ static void doClick(int x, int y) {
     if (inRect(g_btnSettings, x, y)) { openSettings(); return; }
     if (inRect(g_btnSend, x, y)) { sendCurrentText(); return; }
     if (inRect(g_btnFile, x, y)) { pickAndUpload(); return; }
-    if (inRect(g_btnSearchRoom, x, y)) { openSearchWindow(); return; }
-    if (inRect(g_btnNew, x, y)) { openNewRoomDialog(); return; }
+    /* 侧栏 tab：房间 / 好友 */
+    if (inRect(g_btnTabRooms, x, y)) { g_sideMode = 0; InvalidateRect(g_hwnd, NULL, FALSE); return; }
+    if (inRect(g_btnTabFriends, x, y)) { g_sideMode = 1; loadFriends(); InvalidateRect(g_hwnd, NULL, FALSE); return; }
+    if (inRect(g_btnSearchRoom, x, y)) {
+        if (g_sideMode == 1) { loadFriends(); return; }
+        openSearchWindow(); return;
+    }
+    if (inRect(g_btnNew, x, y)) {
+        if (g_sideMode == 1) { g_sideMode = 0; InvalidateRect(g_hwnd, NULL, FALSE); return; }
+        openNewRoomDialog(); return;
+    }
     if (inRect(g_btnRefresh, x, y)) { if (!g_roomId.empty()) loadMessages(false); return; }
     if (inRect(g_btnMembers, x, y)) { openMembers(); return; }
 
-    /* 房间列表点击 */
-    if (x < SIDEBAR_W && y > 70 && y < (int)100000) {
-        int idx = (y - 78) / 56;
-        if (idx >= 0 && idx < (int)g_rooms.size()) {
-            const Room& r = g_rooms[(size_t)idx];
-            if (r.id != g_roomId) openRoom(r);
-            return;
+    /* 列表点击：好友模式=打开私聊；房间模式=打开房间 */
+    if (x < SIDEBAR_W && y > 116) {
+        int idx = (y - 116) / 56;
+        if (g_sideMode == 1) {
+            if (idx >= 0 && idx < (int)g_friends.size()) {
+                openDmAsync(g_friends[(size_t)idx]);
+                return;
+            }
+        } else {
+            if (idx >= 0 && idx < (int)g_rooms.size()) {
+                const Room& r = g_rooms[(size_t)idx];
+                if (r.id != g_roomId) openRoom(r);
+                return;
+            }
         }
     }
 

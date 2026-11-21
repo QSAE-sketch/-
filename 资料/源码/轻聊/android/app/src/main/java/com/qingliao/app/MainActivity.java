@@ -190,16 +190,20 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
             toast("正在加载房间…");
             return;
         }
-        final String[] names = new String[rooms.size()];
+        // 会话列表 = 公共聊天室 / 群聊 + 最下面的「好友私聊」。私聊本身不是房间，
+        // 不会出现在上面这些房间项里，只从这里进入（像微信的会话列表）。
+        final String[] names = new String[rooms.size() + 1];
         for (int i = 0; i < rooms.size(); i++) {
             Api.Room r = rooms.get(i);
             String tag = "public".equals(r.kind) ? "公共" : (r.memberCount + " 人");
             names[i] = r.name + "　（" + tag + "）";
         }
+        names[rooms.size()] = "👤 好友私聊…";
         new AlertDialog.Builder(this)
-                .setTitle("选择房间")
+                .setTitle("选择聊天")
                 .setItems(names, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int which) {
+                        if (which == rooms.size()) { showFriendDms(); return; }
                         openRoom(rooms.get(which));
                     }
                 })
@@ -208,6 +212,74 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
                 })
                 .setNegativeButton("取消", null)
                 .show();
+    }
+
+    /** 好友列表：点某位好友就进入与他的私聊（不是房间） */
+    private void showFriendDms() {
+        toast("正在加载好友…");
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    final List<Api.Friend> fs = api.friends();
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (fs.isEmpty()) {
+                                toast("还没有好友，先在网页版「好友」里添加");
+                                return;
+                            }
+                            final String[] names = new String[fs.size()];
+                            for (int i = 0; i < fs.size(); i++) {
+                                Api.Friend f = fs.get(i);
+                                names[i] = f.nickname + "　（" + f.username + "）";
+                            }
+                            new AlertDialog.Builder(MainActivity.this)
+                                    .setTitle("好友私聊")
+                                    .setItems(names, new DialogInterface.OnClickListener() {
+                                        public void onClick(DialogInterface d, int which) {
+                                            openDm(fs.get(which));
+                                        }
+                                    })
+                                    .setNegativeButton("取消", null)
+                                    .show();
+                        }
+                    });
+                } catch (final Exception e) {
+                    final String msg = (e instanceof Api.ApiException)
+                            ? ((Api.ApiException) e).getMessage() : String.valueOf(e.getMessage());
+                    runOnUiThread(new Runnable() {
+                        public void run() { toast("加载好友失败：" + msg); }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    /** 打开与某位好友的私聊会话 */
+    private void openDm(final Api.Friend f) {
+        toast("正在打开与「" + f.nickname + "」的私聊…");
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    final Api.Room r = api.dm(f.id);
+                    runOnUiThread(new Runnable() {
+                        public void run() {
+                            if (r == null || r.id == null || r.id.length() == 0) {
+                                toast("打开私聊失败");
+                                return;
+                            }
+                            if (r.name == null || r.name.length() == 0) r.name = f.nickname;
+                            openRoom(r);
+                        }
+                    });
+                } catch (final Exception e) {
+                    final String msg = (e instanceof Api.ApiException)
+                            ? ((Api.ApiException) e).getMessage() : String.valueOf(e.getMessage());
+                    runOnUiThread(new Runnable() {
+                        public void run() { toast("打开私聊失败：" + msg); }
+                    });
+                }
+            }
+        }).start();
     }
 
     private void newRoom() {
