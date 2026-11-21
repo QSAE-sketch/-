@@ -245,7 +245,7 @@
       var m = String(location.search || '').match(/[?&]view=(public|rooms|friends|me|drive)/);
       if (m) return m[1];
     } catch (e) { }
-    return 'public';
+    return 'rooms';
   }
 
   var S = {

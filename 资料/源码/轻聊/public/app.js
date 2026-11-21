@@ -27,7 +27,7 @@
   var S = {
     token: localStorage.getItem('ll_token') || '',
     user: null,
-    view: 'public',
+    view: 'rooms',
     rooms: [],
     publicRoomId: '',
     room: null,          // 当前聊天房间
