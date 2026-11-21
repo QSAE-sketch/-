@@ -120,3 +120,13 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 产物：轻聊.apk versionCode=23/versionName=2.4.6（121557B）；轻聊.exe 685568B，仅依赖系统 DLL(COMCTL32/GDI32/WINHTTP/msvcrt 等)；
   旧壳 android/api19-Browser.apk 移到 dist/archive/（dist 已被 gitignore），根目录只留原生产物
 · 验证：APK dex 含「好友私聊」+「/api/dm/」；exe 含「点击发私聊」「刷新好友」；全量 765/0；线上已发布 2.4.6/code23，链接不变
+
+— 2026-11-21　v2.4.7 修复原生客户端头像不显示 + 流光卡顿
+· 用户反馈 exe「一卡一卡、头像完全显示不出来、刷新好像有问题」，怀疑 C++/GDI 自绘
+· 根因①头像：RK_AVATAR_GET 解码进缓存后只写了注释「重绘」，实际没有 InvalidateRect → 头像下好也不画；
+  修复：到货/失败都 InvalidateRect(g_hwnd,NULL,FALSE)；失败集合 g_avFailed 改为 openRoom/刷新时 retryFailedAvatars() 清空重试
+· 根因②卡顿：有 founder 消息时流光定时器 80ms 整窗 GDI 重绘（12.5fps 全量排版+绘制），消息多时 CPU 打满 → 改 220ms
+· 根因③刷新：刷新按钮走 loadMessages(false) 增量，无新消息时画面无变化，像「没反应」→ 改 loadMessages(true) 全量 + 状态「正在刷新…」
+· 验证：注册测试账号 + 上传纯绿 PNG 头像 → exe --shot 截图，侧栏左上角头像正确显示绿色图片（修复前只能是色块首字），
+  侧栏「房间/好友」两栏正常；测试账号已注销、截图已删
+· 产物：轻聊.exe 685568B(14:57 编译)、轻聊.apk versionCode=24/2.4.7；线上已发布 2.4.7/code24，链接不变

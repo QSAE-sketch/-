@@ -399,6 +399,11 @@ static void clearAvatarCache() {
     g_avFailed.clear();
 }
 
+/** 清掉「失败」记录，让头像再试一次（成功缓存保留）。网络刚恢复/网关刚就绪时用 */
+static void retryFailedAvatars() {
+    g_avFailed.clear();
+}
+
 /* ---------------- 下载保存位置 ---------------- */
 static std::wstring g_downloadDir;   // 空 = Windows「下载」文件夹
 
@@ -797,6 +802,7 @@ static void saveFileTo(const Message& m) {
 static void openRoom(const Room& r) {
     g_roomId = r.id;
     g_roomName = r.name;
+    retryFailedAvatars();   // 换房间时给之前失败的头像一次重试机会
     g_page = MessagePage();
     g_layouts.clear();
     g_scrollY = 0;
@@ -1728,7 +1734,9 @@ static void handleResult(AsyncResult* r) {
                         break;
                     }
                 }
-                if (hasGold) SetTimer(g_hwnd, 3, 80, NULL);
+                // 流光动画：原来 80ms（12.5fps）整窗重绘，消息多时 GDI 很吃力、看着一卡一卡；
+                // 放到 220ms（约 4.5fps）视觉仍然顺，但 CPU 占用明显下降
+                if (hasGold) SetTimer(g_hwnd, 3, 220, NULL);
             }
             setStatus(L"");
         } else {
@@ -1791,7 +1799,7 @@ static void handleResult(AsyncResult* r) {
         break;
 
     case RK_AVATAR_GET:
-        // 头像字节到货：解码进缓存后重绘（失败不再重试）
+        // 头像字节到货：解码进缓存后立刻重绘，否则要等下一次轮询才画得出来
         if (r->ok && !r->bytes.empty()) {
             void* img = decodeImage(&r->bytes[0], r->bytes.size());
             if (img) {
@@ -1805,6 +1813,8 @@ static void handleResult(AsyncResult* r) {
             g_avFailed.insert(r->avatarUrl);
         }
         g_avPending.erase(r->avatarUrl);
+        // 头像到货/失败都要重绘一次：到了才有图，失败也能把占位画出来
+        InvalidateRect(g_hwnd, NULL, FALSE);
         break;
 
     case RK_AVATAR_SET:
@@ -3222,7 +3232,14 @@ static void doClick(int x, int y) {
         if (g_sideMode == 1) { g_sideMode = 0; InvalidateRect(g_hwnd, NULL, FALSE); return; }
         openNewRoomDialog(); return;
     }
-    if (inRect(g_btnRefresh, x, y)) { if (!g_roomId.empty()) loadMessages(false); return; }
+    if (inRect(g_btnRefresh, x, y)) {
+        if (!g_roomId.empty()) {
+            retryFailedAvatars();           // 手动刷新时顺便重试失败头像
+            setStatus(L"正在刷新…");
+            loadMessages(true);             // 全量重拉，点了确实能看到刷新效果
+        }
+        return;
+    }
     if (inRect(g_btnMembers, x, y)) { openMembers(); return; }
 
     /* 列表点击：好友模式=打开私聊；房间模式=打开房间 */
