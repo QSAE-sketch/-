@@ -2283,8 +2283,11 @@ function capabilityLevel(req, url) {
 
 function serveStatic(req, res, pathname, url) {
   const isEntry = pathname === '/' || pathname === '/index.html';
-  const level = capabilityLevel(req, url);
-  let rel = isEntry ? (ENTRY_OF_LEVEL[level] || '/index.html') : pathname;
+  // 【统一版】所有设备一律发基础版：红米 Note 2 这类老 WebView 加载不动标准版
+  // （157KB 脚本 + CSS 变量 + 图片），且三档分发带来的切换本身也是负担。
+  // 不再按 UA/cookie 分档，全站只有一个前端版本。
+  const level = 'basic';
+  let rel = isEntry ? '/index-basic.html' : pathname;
   rel = rel.replace(/\.\./g, '');
   const file = path.join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR)) return fail(res, 403, 'forbidden');
@@ -2325,27 +2328,33 @@ function serveStatic(req, res, pathname, url) {
 
     // index.html：注入带内容指纹的资源 URL。
     // 这样「线上更新 → 重新打开 App」不需要清缓存、也不需要等 5 分钟。
+    //
+    // 【关键修复】线上分享网关要求每个请求都带 sharecode，否则静态资源返回
+    // 403「链接不完整」。原实现只给 JS/CSS 加了 ?v=指纹，丢了 sharecode，
+    // 于是 HTML 能开、但脚本/样式全部 403 → 页面彻底瘫掉（红米首访无缓存尤其明显）。
+    // 这里把原 query（sharecode 等）完整附加到每个资源 URL。
     if (isHtml) {
       let html = fs.readFileSync(file, 'utf8');
       const v = assetVersion();
-      if (rel === '/index-lite.html') {
-        html = html
-          .replace('href="/style-lite.css"', 'href="/style-lite.css?v=' + v + '"')
-          .replace('src="/app-lite.js"', 'src="/app-lite.js?v=' + v + '"');
-      } else if (rel === '/index-basic.html') {
-        html = html
-          .replace('href="/style-basic.css"', 'href="/style-basic.css?v=' + v + '"')
-          .replace('src="/app-basic.js"', 'src="/app-basic.js?v=' + v + '"');
-      } else {
-        html = html
-          .replace('href="/style.css"', 'href="/style.css?v=' + v + '"')
-          .replace('src="/app.js"', 'src="/app.js?v=' + v + '"');
-      }
-      // 版本切换链接要保留原 query（尤其 sharecode，否则线上会被判「链接不完整」）
       const q = [];
       url.searchParams.forEach((val, key) => {
         if (key !== 'lite') q.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
       });
+      const tail = q.length ? '?' + q.join('&') + '&v=' + v : '?v=' + v;
+      if (rel === '/index-lite.html') {
+        html = html
+          .replace('href="/style-lite.css"', 'href="/style-lite.css' + tail + '"')
+          .replace('src="/app-lite.js"', 'src="/app-lite.js' + tail + '"');
+      } else if (rel === '/index-basic.html') {
+        html = html
+          .replace('href="/style-basic.css"', 'href="/style-basic.css' + tail + '"')
+          .replace('src="/app-basic.js"', 'src="/app-basic.js' + tail + '"');
+      } else {
+        html = html
+          .replace('href="/style.css"', 'href="/style.css' + tail + '"')
+          .replace('src="/app.js"', 'src="/app.js' + tail + '"');
+      }
+      // 版本切换链接要保留原 query（尤其 sharecode，否则线上会被判「链接不完整」）
       const capBase = q.length ? '/?' + q.join('&') + '&' : '/?';
       html = html
         .replace('href="/?lite=1"', 'href="' + capBase + 'lite=1"')

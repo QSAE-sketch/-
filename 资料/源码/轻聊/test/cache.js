@@ -4,7 +4,7 @@
  *
  * 覆盖：
  *   1. 入口页 no-store（冷启动必定回源）
- *   2. index.html 里 app.js / style.css 带内容指纹 ?v=
+ *   2. 入口页里 app-basic.js / style-basic.css 带内容指纹 ?v=
  *   3. 带指纹的 JS/CSS 可长缓存，不带指纹的 no-store（兼容旧客户端）
  *   4. 文件内容一变，指纹就变（旧缓存 URL 不再被引用）
  *   5. 带 ?v= 的资源内容与原文件一致（不影响功能）
@@ -51,10 +51,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     String(idx.headers['cache-control']).indexOf('no-store') >= 0, idx.headers['cache-control']);
 
   const html = idx.body.toString('utf8');
-  const jsMatch = html.match(/\/app\.js\?v=([0-9a-f]+)/);
-  const cssMatch = html.match(/\/style\.css\?v=([0-9a-f]+)/);
-  check('index.html 里 app.js 带内容指纹 ?v=', !!jsMatch, html.match(/<script[^>]*>/g));
-  check('index.html 里 style.css 带内容指纹 ?v=', !!cssMatch, html.match(/<link[^>]*>/g));
+  const jsMatch = html.match(/\/app-basic\.js\?v=([0-9a-f]+)/);
+  const cssMatch = html.match(/\/style-basic\.css\?v=([0-9a-f]+)/);
+  check('入口页里 app-basic.js 带内容指纹 ?v=', !!jsMatch, html.match(/<script[^>]*>/g));
+  check('入口页里 style-basic.css 带内容指纹 ?v=', !!cssMatch, html.match(/<link[^>]*>/g));
   check('两个指纹一致（同一次构建）', !!(jsMatch && cssMatch && jsMatch[1] === cssMatch[1]));
 
   if (!jsMatch) {
@@ -63,42 +63,42 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   const v = jsMatch[1];
 
-  const js = await get('/app.js?v=' + v);
-  const css = await get('/style.css?v=' + v);
-  check('GET /app.js?v=… 返回 200', js.status === 200, js.status);
-  check('GET /style.css?v=… 返回 200', css.status === 200, css.status);
-  check('带指纹的 app.js 可长缓存',
+  const js = await get('/app-basic.js?v=' + v);
+  const css = await get('/style-basic.css?v=' + v);
+  check('GET /app-basic.js?v=… 返回 200', js.status === 200, js.status);
+  check('GET /style-basic.css?v=… 返回 200', css.status === 200, css.status);
+  check('带指纹的 app-basic.js 可长缓存',
     /max-age=31536000/.test(String(js.headers['cache-control'])), js.headers['cache-control']);
-  check('带指纹的 style.css 可长缓存',
+  check('带指纹的 style-basic.css 可长缓存',
     /max-age=31536000/.test(String(css.headers['cache-control'])), css.headers['cache-control']);
 
-  const diskJs = fs.readFileSync(path.join(ROOT, 'public', 'app.js'));
-  const diskCss = fs.readFileSync(path.join(ROOT, 'public', 'style.css'));
-  check('带 ?v= 的 app.js 内容与原文件一致', js.body.equals(diskJs));
-  check('带 ?v= 的 style.css 内容与原文件一致', css.body.equals(diskCss));
+  const diskJs = fs.readFileSync(path.join(ROOT, 'public', 'app-basic.js'));
+  const diskCss = fs.readFileSync(path.join(ROOT, 'public', 'style-basic.css'));
+  check('带 ?v= 的 app-basic.js 内容与原文件一致', js.body.equals(diskJs));
+  check('带 ?v= 的 style-basic.css 内容与原文件一致', css.body.equals(diskCss));
 
-  const oldJs = await get('/app.js');
-  check('不带版本号的 /app.js 是 no-store（不残留旧缓存）',
+  const oldJs = await get('/app-basic.js');
+  check('不带版本号的 /app-basic.js 是 no-store（不残留旧缓存）',
     String(oldJs.headers['cache-control']).indexOf('no-store') >= 0, oldJs.headers['cache-control']);
   const idx2 = await get('/index.html');
   check('GET /index.html 也是 no-store',
     String(idx2.headers['cache-control']).indexOf('no-store') >= 0, idx2.headers['cache-control']);
 
   // 内容变化 → 指纹变化（临时追加一行注释，随后还原）
-  const p = path.join(ROOT, 'public', 'app.js');
+  const p = path.join(ROOT, 'public', 'app-basic.js');
   const orig = fs.readFileSync(p);
   let after = v;
   try {
     fs.appendFileSync(p, '\n/* cache-test-probe */\n', 'utf8');
     await sleep(150);
     const html2 = (await get('/')).body.toString('utf8');
-    const m2 = html2.match(/\/app\.js\?v=([0-9a-f]+)/);
+    const m2 = html2.match(/\/app-basic\.js\?v=([0-9a-f]+)/);
     after = m2 ? m2[1] : v;
   } finally {
     fs.writeFileSync(p, orig);
   }
-  check('app.js 内容一变，指纹立即变化（旧缓存 URL 失效）', after !== v, { before: v, after });
-  const restored = (await get('/')).body.toString('utf8').match(/\/app\.js\?v=([0-9a-f]+)/);
+  check('app-basic.js 内容一变，指纹立即变化（旧缓存 URL 失效）', after !== v, { before: v, after });
+  const restored = (await get('/')).body.toString('utf8').match(/\/app-basic\.js\?v=([0-9a-f]+)/);
   check('还原文件后指纹恢复', !!(restored && restored[1] === v), restored && restored[1]);
 
   // API 不受影响

@@ -51,3 +51,14 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · Git 本地仓库备份 chatapp/（934177c 基线 + 718c6cd 搜索功能）
 · 搜索房间（仅标准版 + 桌面版）：GET /api/rooms/search 按名大小写不敏感匹配，排除私聊 / 已解散；结果关键词高亮 + 行尾「进去看看 / 加入该房间」双按钮；网页 ?rq= 搜索深链
 · 桌面侧栏「搜索房间 | ＋ 新建」+ 搜索窗口 + 密码小窗；806/0、selftest 18/18
+
+— 2026-11-21　v2.3 全站统一基础版（修红米 Note 2 打不开）
+· 诉求：参考 APK 下载站（纯静态/ES5/零图片），网站只保留最兼容的一个版本，去掉无关
+· 诊断：线上三档分发本就正确（红米 UA→基础版），但基础版仍带版本切换/提示；真正拦路的是
+  分享网关校验——裸请求 JS/CSS 返回 403，浏览器带网关下发的 __wb_rsc cookie 后 200
+· 关键发现：网关会把 query 里的 sharecode 剥离后再转发后端（probe 参数能到、sharecode 到不了），
+  所以服务端无法从 searchParams 读 sharecode 注入资源；但浏览器侧 cookie 链路可正常加载
+· 改动：serveStatic 入口无条件发 index-basic.html（不再按 UA/cookie 分档）；去掉页面版本切换链接
+  与「改用低配版」等提示；版本 2.3.0/code 16；room-features/cache 测试改统一基础版语义，全量 797/0
+· 验证：发布后 红米 Note 2 UA + 无头 Chrome 渲染登录页完整（输入框/登录按钮/设备自检齐全），
+  页面+JS+CSS+API 全链路 200；分享链接 https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A

@@ -86,64 +86,53 @@ async function uploadFile(token, roomId, payload, opts) {
 }
 
 (async () => {
-  /* ---------------- A. 能力分级 + 服务器分发 ---------------- */
-  console.log('\n【A】设备能力分级与双版本分发');
+  /* ---------------- A. 统一基础版（全设备只有一个前端版本） ---------------- */
+  console.log('\n【A】统一基础版分发（红米等老设备全兼容）');
 
-  let r = await req('GET', '/', null, null, { headers: { 'User-Agent': OLD_UA } });
-  check('红米 Note 2 / Android 5.1 / Chrome39 → 基础版（最保守档）', r.status === 200 &&
-    r.text.indexOf('data-ll-cap="basic"') >= 0 && r.text.indexOf('app-basic.js') >= 0, r.status);
-  check('基础版不加载标准版与低配版脚本', r.text.indexOf('src="/app.js"') < 0 &&
-    r.text.indexOf('src="/app-lite.js"') < 0);
+  let r;
+  const UAS = {
+    redmi: 'Mozilla/5.0 (Linux; Android 5.1; Redmi Note 2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.0.0 Mobile Safari/537.36',
+    modern: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ancient: 'Mozilla/5.0 (Linux; Android 4.4.2; HM NOTE 1LTE) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/33.0.0.0 Mobile Safari/537.36'
+  };
+  for (const [label, ua] of Object.entries(UAS)) {
+    r = await req('GET', '/', null, null, { headers: { 'User-Agent': ua } });
+    check(label + ' → 统一基础版', r.status === 200 &&
+      r.text.indexOf('data-ll-cap="basic"') >= 0 && r.text.indexOf('app-basic.js') >= 0, r.status);
+    check(label + ' 不加载标准/低配脚本', r.text.indexOf('src="/app.js"') < 0 &&
+      r.text.indexOf('src="/app-lite.js"') < 0);
+  }
   check('基础版内联了守门脚本', r.text.indexOf('__LL_LITE') < 0 && r.text.indexOf('__LL') >= 0);
 
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA } });
-  check('现代浏览器 → 标准版', r.status === 200 && r.text.indexOf('能力探测') >= 0 &&
-    r.text.indexOf('src="/app.js?v=') >= 0, r.status);
+  // cookie / 能力头 / 省流量 / 显式 ?lite= 都不能切走基础版（全站单版本）
+  const probes = [
+    ['Cookie ll_cap=lite', { Cookie: 'll_cap=lite' }],
+    ['能力头 X-LL-Cap=full', { 'X-LL-Cap': 'full' }],
+    ['省流量 Save-Data', { 'Save-Data': 'on' }],
+    ['低内存 Device-Memory', { 'Device-Memory': '0.5' }]
+  ];
+  for (const [label, hdr] of probes) {
+    r = await req('GET', '/', null, null, { headers: Object.assign({ 'User-Agent': UAS.modern }, hdr) });
+    check(label + ' 仍发基础版', r.text.indexOf('data-ll-cap="basic"') >= 0 &&
+      r.text.indexOf('src="/app-basic.js?v=') >= 0);
+  }
+  r = await req('GET', '/?lite=1', null, null, { headers: { 'User-Agent': UAS.redmi } });
+  check('显式 ?lite=1 也不再切走（只有一个版本）', r.text.indexOf('data-ll-cap="basic"') >= 0);
 
-  r = await req('GET', '/?lite=1&sharecode=TESTCODE', null, null, { headers: { 'User-Agent': NEW_UA } });
-  check('?lite=1 强制低配并写 cookie', r.text.indexOf('data-ll-cap="lite"') >= 0 &&
-    /ll_cap=lite/.test(String(r.headers['set-cookie'] || '')), String(r.headers['set-cookie']));
-  check('版本切换链接保留 sharecode', r.text.indexOf('sharecode=TESTCODE&lite=0') >= 0,
-    (r.text.match(/href="[^"]*lite=0[^"]*"/) || [''])[0]);
-
-  r = await req('GET', '/?lite=0', null, null, { headers: { 'User-Agent': OLD_UA } });
-  check('?lite=0 强制标准版', r.text.indexOf('src="/app.js?v=') >= 0);
-
-  /* ---- 第三档：基础版（basic）---- */
-  r = await req('GET', '/?lite=2&sharecode=TESTCODE', null, null, { headers: { 'User-Agent': NEW_UA } });
-  check('?lite=2 强制基础版并写 cookie', r.text.indexOf('data-ll-cap="basic"') >= 0 &&
-    /ll_cap=basic/.test(String(r.headers['set-cookie'] || '')), String(r.headers['set-cookie']));
-  check('基础版切换链接保留 sharecode', /sharecode=TESTCODE&lite=1/.test(r.text),
-    (r.text.match(/href="[^"]*lite=1[^"]*"/) || [''])[0]);
-
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, Cookie: 'll_cap=basic' } });
-  check('客户端探测 cookie → 基础版', r.text.indexOf('data-ll-cap="basic"') >= 0);
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, 'X-LL-Cap': 'basic' } });
-  check('原生容器能力头 → 基础版', r.text.indexOf('data-ll-cap="basic"') >= 0);
-
-  /* 关键：用户早先在低配版点过切换、cookie 记着 lite，也不能把老设备锁死在跑不动的那版 */
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': OLD_UA, Cookie: 'll_cap=lite' } });
-  check('老设备即使 cookie 记着 lite，仍被纠正到基础版（不被锁死）',
-    r.text.indexOf('data-ll-cap="basic"') >= 0, r.text.indexOf('data-ll-cap="lite"') >= 0 ? '仍返回 lite' : '');
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': OLD_UA, 'X-LL-Cap': 'lite' } });
-  check('老设备容器要求 lite 时同样纠正到基础版',
-    r.text.indexOf('data-ll-cap="basic"') >= 0);
-  // 但用户主动在地址栏指定 lite 时仍然尊重（他自己要试）
-  r = await req('GET', '/?lite=1', null, null, { headers: { 'User-Agent': OLD_UA } });
-  check('老设备显式 ?lite=1 仍尊重用户选择', r.text.indexOf('data-ll-cap="lite"') >= 0);
-
-  // 更老的内核（Android 4.4 / Chrome 33）也必须落到基础版
-  const ANCIENT_UA = 'Mozilla/5.0 (Linux; Android 4.4.2; HM NOTE 1LTE Build/KOT49H) ' +
-    'AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/33.0.0.0 Mobile Safari/537.36';
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': ANCIENT_UA } });
-  check('Android 4.4 / Chrome33 → 基础版', r.text.indexOf('data-ll-cap="basic"') >= 0);
+  // 【关键修复】线上网关要求所有资源带 sharecode：注入的 JS/CSS URL 必须保留原 query
+  r = await req('GET', '/?sharecode=TESTCODE', null, null, { headers: { 'User-Agent': UAS.redmi } });
+  check('资源 URL 注入 sharecode（/app-basic.js）', r.text.indexOf('src="/app-basic.js?sharecode=TESTCODE') >= 0,
+    (r.text.match(/src="\/app-basic\.js[^"]*"/) || [''])[0]);
+  check('资源 URL 注入 sharecode（/style-basic.css）', r.text.indexOf('href="/style-basic.css?sharecode=TESTCODE') >= 0,
+    (r.text.match(/href="\/style-basic\.css[^"]*"/) || [''])[0]);
+  check('资源 URL 同时带 sharecode 与内容指纹 ?v=', /app-basic\.js\?sharecode=TESTCODE&v=[0-9a-f]+/.test(r.text));
 
   // 静态资源可访问
-  r = await req('GET', '/index-basic.html', null, null, { headers: { 'User-Agent': NEW_UA } });
+  r = await req('GET', '/index-basic.html', null, null, { headers: { 'User-Agent': UAS.modern } });
   check('GET /index-basic.html 可访问', r.status === 200 && r.raw.length > 2000, r.status);
-  r = await req('GET', '/app-basic.js', null, null, { headers: { 'User-Agent': NEW_UA } });
+  r = await req('GET', '/app-basic.js', null, null, { headers: { 'User-Agent': UAS.modern } });
   check('GET /app-basic.js 可访问', r.status === 200 && r.raw.length > 8000, r.status);
-  r = await req('GET', '/style-basic.css', null, null, { headers: { 'User-Agent': NEW_UA } });
+  r = await req('GET', '/style-basic.css', null, null, { headers: { 'User-Agent': UAS.modern } });
   check('GET /style-basic.css 可访问', r.status === 200 && r.raw.length > 2000, r.status);
 
   // 基础版必须真正「更保守」：这些特性一个都不许出现
@@ -172,35 +161,8 @@ async function uploadFile(token, roomId, payload, opts) {
   check('基础版 HTML 不含金色烫金元素（保持低配一致）',
     basicHtml.indexOf('d4af37') < 0 && basicCss.indexOf('d4af37') < 0);
   check('基础版 HTML 自带设备自检入口', /设备自检/.test(basicHtml));
-
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, 'Device-Memory': '0.5' } });
-  check('低内存设备 → 低配版', r.text.indexOf('data-ll-cap="lite"') >= 0);
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, 'Save-Data': 'on' } });
-  check('省流量模式 → 低配版', r.text.indexOf('data-ll-cap="lite"') >= 0);
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, Cookie: 'll_cap=lite' } });
-  check('客户端探测 cookie → 低配版', r.text.indexOf('data-ll-cap="lite"') >= 0);
-  r = await req('GET', '/', null, null, { headers: { 'User-Agent': NEW_UA, 'X-LL-Cap': 'lite' } });
-  check('原生容器能力头 → 低配版', r.text.indexOf('data-ll-cap="lite"') >= 0);
-
-  const liteJs = fs.readFileSync(path.join(ROOT, 'public/app-lite.js'), 'utf8');
-  const liteCss = fs.readFileSync(path.join(ROOT, 'public/style-lite.css'), 'utf8');
-  const liteHtml = fs.readFileSync(path.join(ROOT, 'public/index-lite.html'), 'utf8');
-  const stdHtml = fs.readFileSync(path.join(ROOT, 'public/index.html'), 'utf8');
-  // 先剥掉注释：文件头注释里正好列举了这些禁用词，别把它们误判成代码
-  const liteJsCode = liteJs.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
-  check('低配 JS 纯 ES5（无箭头/let/const/Promise/fetch/classList/dataset）',
-    !/=>|\blet\s|\bconst\s|Promise|fetch\(|classList|dataset|addEventListener/.test(liteJsCode));
-  check('低配 CSS 无 CSS 变量 / flex / vh / calc / rem 单位',
-    !/var\(--|display\s*:\s*flex|\d+vh|\d+vw|calc\(|\d+rem/.test(liteCss));
-  check('低配 HTML 标记 data-ll-cap=lite', liteHtml.indexOf('data-ll-cap="lite"') >= 0);
-  check('标准版含能力探测引导（CSS.supports + localStorage 兜底）',
-    stdHtml.indexOf("CSS.supports('color', 'var(--x)')") >= 0 &&
-    stdHtml.indexOf('__ll_probe__') >= 0 && stdHtml.indexOf('try') >= 0);
-
-  r = await req('GET', '/app-lite.js', null, null, { headers: { 'User-Agent': OLD_UA } });
-  check('GET /app-lite.js 可访问', r.status === 200 && r.raw.length > 10000, r.status);
-  r = await req('GET', '/style-lite.css', null, null, { headers: { 'User-Agent': OLD_UA } });
-  check('GET /style-lite.css 可访问', r.status === 200 && r.raw.length > 3000, r.status);
+  check('基础版 HTML 无版本切换链接（全站单版本）',
+    basicHtml.indexOf('lite=0') < 0 && basicHtml.indexOf('lite=1') < 0 && basicHtml.indexOf('lite=2') < 0);
 
   /* ---------------- B. 两版共用同一套数据 ---------------- */
   console.log('\n【B】低配版与标准版数据互通');

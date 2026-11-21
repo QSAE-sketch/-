@@ -643,8 +643,7 @@
   function doUpload(file) {
     if (!S.room) { alert('请先进入一个房间'); return; }
     if (num(file.size) > CHUNK_GUESS) {
-      alert('基础版单次上传上限 ' + fmtSize(CHUNK_GUESS) + '（这个文件 ' + fmtSize(file.size) + '）。\n' +
-        '请改用「低配版」或「标准版」上传大文件，账号与文件都是同一套。');
+      alert('单次上传上限 ' + fmtSize(CHUNK_GUESS) + '（这个文件 ' + fmtSize(file.size) + '），文件过大，请换小一点的文件。');
       return;
     }
     setText($('upHint'), '正在上传：' + file.name + ' …');
@@ -662,7 +661,7 @@
       }
       if (num(d.totalChunks) > 1) {
         setText($('upHint'), '');
-        alert('该文件需要分片上传，请改用低配版或标准版');
+        alert('该文件过大，当前版本不支持分片上传，请换小一点的文件');
         return;
       }
       putSingleChunk(d.fileId, file);
@@ -805,7 +804,7 @@
 
     h += '<div class="card"><div class="ch">关于</div><div class="cb">' +
       '<div class="ls">版本：' + esc(S.version && S.version.version ? S.version.version.name : '—') +
-      '（基础版 · 与低配/标准版数据互通）</div>' +
+      '（基础版 · 兼容模式）</div>' +
       '<div style="margin-top:8px">' +
       '<button class="bt sm bg" onclick="LL.logout()">退出登录</button> ' +
       '<button class="bt sm bd2" onclick="LL.deleteAccount()">注销账号</button>' +
