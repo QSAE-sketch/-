@@ -577,6 +577,16 @@ footer { color: var(--fg-3); }
 .prof-sub { font-size: 12px; color: var(--fg-3); margin-top: 4px; word-break: break-all; }
 
 /* 好友申请条目 */
+/* 好友申请横条入口 + 红点 */
+.req-entry { position: relative; padding-left: 22px; }
+.req-entry .num { color: var(--fg-3); margin-left: 4px; }
+.req-dot {
+  position: absolute; left: 7px; top: 50%; margin-top: -4px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: transparent;
+}
+.req-dot.on { background: #f85149; box-shadow: 0 0 0 2px rgba(248,81,73,.2); }
+
 .req-row {
   display: flex; align-items: flex-start; padding: 12px 13px;
   border-bottom: 1px solid var(--border-2);

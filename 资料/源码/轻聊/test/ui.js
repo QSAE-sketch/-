@@ -1186,87 +1186,77 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   navBtns[2].onclick.call(navBtns[2]);
   await wait(900);
 
-  const reqRows = findAll(registry.view, 'req-row');
+  // 新 UI：好友页只放两条横条入口，点开才在弹窗里列出申请
+  const entries = findAll(registry.view, 'req-entry');
+  if (entries.length !== 2) {
+    console.error('❌ 好友页应有「收到的申请 / 我发出的请求」两条横条，实际 ' + entries.length + ' 条');
+    process.exit(1);
+  }
+  const inEntry = entries[0];
+  // 横条内部是 innerHTML 字符串（DOM 桩不解析成子节点），直接读字符串断言
+  const inEntryHtml = inEntry.innerHTML || '';
+  if (inEntryHtml.indexOf('收到的好友申请') < 0 || inEntryHtml.indexOf('>1<') < 0) {
+    console.error('❌ 「收到的好友申请」横条未显示数量 1: ' + inEntryHtml);
+    process.exit(1);
+  }
+  if (inEntryHtml.indexOf('req-dot on') < 0) {
+    console.error('❌ 有新申请时横条红点未点亮: ' + inEntryHtml);
+    process.exit(1);
+  }
+  console.log('✓ 好友页为横条入口，收到的申请显示数量 + 红点');
+
+  // 点横条 → 弹窗里列出申请条目
+  inEntry.onclick();
+  await wait(200);
+  const reqRows = findAll(registry.modalBody, 'req-row');
   if (reqRows.length !== 1) {
-    console.error('❌ 「收到的好友申请」应有 1 条，实际 ' + reqRows.length + ' 条');
+    console.error('❌ 弹窗内「收到的好友申请」应有 1 条，实际 ' + reqRows.length + ' 条');
     process.exit(1);
   }
   const reqRow = reqRows[0];
   const reqText = textOf(reqRow);
-  if (reqText.indexOf('好友仔') < 0) {
-    console.error('❌ 申请条目缺少申请人昵称: ' + reqText);
+  if (reqText.indexOf('好友仔') < 0 || reqText.indexOf(pal) < 0 ||
+      reqText.indexOf(note) < 0 || reqText.indexOf('申请时间') < 0) {
+    console.error('❌ 弹窗申请条目缺少昵称/账号/附言/时间: ' + reqText);
     process.exit(1);
   }
-  if (reqText.indexOf(pal) < 0) {
-    console.error('❌ 申请条目缺少申请人账号: ' + reqText);
-    process.exit(1);
-  }
-  if (reqText.indexOf(note) < 0) {
-    console.error('❌ 申请条目缺少附言: ' + reqText);
-    process.exit(1);
-  }
-  if (reqText.indexOf('申请时间') < 0) {
-    console.error('❌ 申请条目缺少申请时间: ' + reqText);
-    process.exit(1);
-  }
-  console.log('✓ 「收到的好友申请」展示昵称 / 账号 / 附言 / 申请时间');
+  console.log('✓ 点横条弹出窗口，条目展示昵称 / 账号 / 附言 / 申请时间');
 
   const reqAv = findOne(reqRow, 'row-av');
-  if (!reqAv) {
-    console.error('❌ 申请条目缺少申请人头像');
+  if (!reqAv || !reqAv.style.background || !reqAv.getAttribute('data-profile')) {
+    console.error('❌ 弹窗申请条目缺少可点击头像（色块 + data-profile）');
     process.exit(1);
   }
-  if (!reqAv.style.background) {
-    console.error('❌ 申请人头像没有底色');
-    process.exit(1);
-  }
-  if (!reqAv.getAttribute('data-profile')) {
-    console.error('❌ 申请人头像缺少 data-profile（不可点击看资料）');
-    process.exit(1);
-  }
-  console.log('✓ 申请条目带头像（色块 + 首字，且可点击）');
-
   const reqActs = findOne(reqRow, 'req-acts');
   const acceptBtn = reqActs && reqActs.children[0];
   const rejectBtn = reqActs && reqActs.children[1];
-  if (!acceptBtn || acceptBtn.textContent !== '同意') {
-    console.error('❌ 申请条目缺少「同意」按钮');
+  if (!acceptBtn || acceptBtn.textContent !== '同意' || !rejectBtn || rejectBtn.textContent !== '拒绝') {
+    console.error('❌ 弹窗申请条目缺少「同意 / 拒绝」操作');
     process.exit(1);
   }
-  if (!rejectBtn || rejectBtn.textContent !== '拒绝') {
-    console.error('❌ 申请条目缺少「拒绝」按钮');
-    process.exit(1);
-  }
-  console.log('✓ 申请条目提供「同意」与「拒绝」操作');
+  console.log('✓ 弹窗条目带头像（可看资料）与同意 / 拒绝操作');
 
-  // 点头像 → 打开申请加好友页面
+  // 点头像 → 弹窗收起 + 打开资料页
   reqAv.click();
   await wait(700);
   if (registry.friendAdd.className.indexOf('hide') >= 0) {
     console.error('❌ 点头像没有打开资料页');
     process.exit(1);
   }
+  if (registry.modal.className.indexOf('hide') < 0) {
+    console.error('❌ 点头像看资料时弹窗未收起，仍会遮挡资料页');
+    process.exit(1);
+  }
   const profText = textOf(registry.faView);
-  if (profText.indexOf('好友仔') < 0) {
-    console.error('❌ 资料页缺少对方昵称: ' + profText);
+  if (profText.indexOf('好友仔') < 0 || profText.indexOf(pal) < 0 || profText.indexOf('注册于') < 0) {
+    console.error('❌ 资料页缺少昵称 / 账号 / 注册时间: ' + profText);
     process.exit(1);
   }
-  if (profText.indexOf(pal) < 0) {
-    console.error('❌ 资料页缺少对方账号: ' + profText);
-    process.exit(1);
-  }
-  if (profText.indexOf('注册于') < 0) {
-    console.error('❌ 资料页缺少注册时间: ' + profText);
-    process.exit(1);
-  }
-  console.log('✓ 点头像进入资料页，展示昵称 / 账号 / 注册时间');
-
-  // 对方已发来申请 → 资料页应提示并给出「去处理」
   if (profText.indexOf('去处理好友申请') < 0) {
     console.error('❌ 资料页未提示「对方已申请」: ' + profText);
     process.exit(1);
   }
-  console.log('✓ 资料页识别出「对方已申请添加你」并给出处理入口');
+  console.log('✓ 点头像弹窗收起并进入资料页，展示昵称 / 账号 / 注册时间 / 处理入口');
 
   // 返回主界面
   registry.faBackBtn.onclick();
@@ -1277,25 +1267,24 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   }
   console.log('✓ 资料页返回按钮正常');
 
-  // 同意 → 双方成为好友，好友列表实时刷新
-  const acceptBtn2 = findAll(registry.view, 'req-acts')[0].children[0];
+  // 重新点横条开弹窗 → 同意 → 双方成为好友，好友列表实时刷新
+  const inEntry2 = findAll(registry.view, 'req-entry')[0];
+  inEntry2.onclick();
+  await wait(150);
+  const acceptBtn2 = findAll(registry.modalBody, 'req-acts')[0].children[0];
   acceptBtn2.click();
   await wait(1200);
-  const afterAccept = findAll(registry.view, 'req-row');
-  if (afterAccept.length !== 0) {
-    console.error('❌ 同意后申请仍留在列表里');
+  const afterEntries = findAll(registry.view, 'req-entry');
+  if (afterEntries.length !== 2 || (afterEntries[0].innerHTML || '').indexOf('>0<') < 0) {
+    console.error('❌ 同意后「收到的申请」横条数量未归零: ' + (afterEntries[0] && afterEntries[0].innerHTML));
     process.exit(1);
   }
   const friendText = textOf(registry.view);
-  if (friendText.indexOf('我的好友 (1)') < 0) {
+  if (friendText.indexOf('我的好友 (1)') < 0 || friendText.indexOf('好友仔') < 0) {
     console.error('❌ 同意后好友列表未刷新: ' + friendText.slice(0, 400));
     process.exit(1);
   }
-  if (friendText.indexOf('好友仔') < 0) {
-    console.error('❌ 同意后好友列表里没有对方');
-    process.exit(1);
-  }
-  console.log('✓ 同意后申请消失、好友列表实时刷新（1 位好友）');
+  console.log('✓ 同意后横条数量归零、好友列表实时刷新（1 位好友）');
 
   // 双向：服务端确认对方也能看到我
   const palFriends = await apiCall('GET', '/api/friends', null, preg.token);
@@ -1305,17 +1294,23 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   }
   console.log('✓ 好友关系双向成立（对方的好友列表里也有我）');
 
-  // 空状态
+  // 空状态：横条仍显示 0，点开弹窗提示暂无
   navBtns[3].onclick.call(navBtns[3]);
   await wait(200);
   navBtns[2].onclick.call(navBtns[2]);
   await wait(900);
-  const emptyTxt = textOf(registry.view);
-  if (emptyTxt.indexOf('收到的好友申请 (0)') < 0 || emptyTxt.indexOf('暂无收到的好友申请') < 0) {
-    console.error('❌ 申请列表为空时缺少空状态提示: ' + emptyTxt.slice(0, 300));
+  const emptyEntry = findAll(registry.view, 'req-entry')[0];
+  if (!emptyEntry || (emptyEntry.innerHTML || '').indexOf('收到的好友申请') < 0) {
+    console.error('❌ 空状态下收到的申请横条消失: ' + textOf(registry.view).slice(0, 300));
     process.exit(1);
   }
-  console.log('✓ 申请列表为空时显示「暂无收到的好友申请」空状态');
+  emptyEntry.onclick();
+  await wait(150);
+  if (textOf(registry.modalBody).indexOf('暂无收到的好友申请') < 0) {
+    console.error('❌ 弹窗内缺少空状态提示: ' + textOf(registry.modalBody).slice(0, 300));
+    process.exit(1);
+  }
+  console.log('✓ 申请为空时横条显示 0、弹窗内提示「暂无收到的好友申请」');
 
   /* ================================================================
    * UTF-8 显式编码：老内核的 XHR.send(字符串) 可能按本地编码发中文，

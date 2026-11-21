@@ -172,6 +172,17 @@ function check(name, cond, extra) {
   check('对端可回复私聊', r.status === 200, r.json);
   r = await req('GET', '/api/rooms/' + dmId + '/messages?since=0', null, tb);
   check('私聊消息落库可见', r.json.messages.length >= 2, r.json.messages);
+  // 私聊不是房间：不出现在房间列表、陌生人（含免密放行）不能围观、dm/list 只返本人
+  r = await req('GET', '/api/rooms', null, ta);
+  check('私聊不作为房间出现在房间列表', !r.json.rooms.some((x) => x.id === dmId), r.json.rooms);
+  r = await req('GET', '/api/rooms/' + dmId + '/messages?since=0', null, tc);
+  check('陌生人不能读私聊消息', r.status === 403, r.json);
+  r = await req('GET', '/api/rooms/' + dmId + '/members', null, tc);
+  check('陌生人不能看私聊成员', r.status === 403, r.json);
+  r = await req('GET', '/api/dm/list', null, tc);
+  check('dm/list 不泄露他人私聊', !r.json.items.some((x) => x.id === dmId), r.json);
+  r = await req('GET', '/api/dm/list', null, ta);
+  check('dm/list 返回本人私聊', r.json.items.some((x) => x.id === dmId), r.json);
 
   console.log('\n【6】删除（仅本账号隐藏）与撤回（2分钟内彻底移除）');
   r = await req('POST', '/api/rooms/' + pubId + '/messages', { kind: 'text', content: '待删除消息' }, ta);

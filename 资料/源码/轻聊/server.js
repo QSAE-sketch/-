@@ -385,6 +385,9 @@ function roleInfo(key) {
 /* ================================================================== */
 
 function canViewRoom(room, user, token) {
+  // 私聊：仅双方成员可见。这是两人之间的对话，不是房间——任何其他人（含最高权限）
+  // 都不能凭 id 围观，否则就是隐私泄露。必须放在最高权限放行之前。
+  if (room.kind === ROOM_DM) return db.isMember(room.id, user.id);
   // 最高权限：可进入任意房间查看 / 清理内容（写入仍受房间规则限制）
   if (perm.isMaster(user)) return true;
   if (room.kind === ROOM_PUBLIC) return true;
@@ -690,6 +693,37 @@ route('POST', '/api/logout', async (req, res, ctx) => {
 route('GET', '/api/me', async (req, res, ctx) => {
   ok(res, { user: publicUser(ctx.user), storage: storageInfo(ctx.user) });
 });
+
+/* ---------------- 同时在线（仅标准版使用） ---------------- */
+
+/**
+ * 心跳：前端定时调用，刷新当前用户 lastSeen。
+ * 在线判定口径：最近 ONLINE_WINDOW_MS 内有过任何请求/心跳的用户 = 在线。
+ */
+const ONLINE_WINDOW_MS = 60 * 1000;
+route('POST', '/api/pulse', async (req, res, ctx) => {
+  ctx.user.lastSeen = now();
+  db.put('users', ctx.user);
+  ok(res, { serverTime: now() });
+});
+
+/**
+ * 公共聊天室「同时在线」人数：最近 ONLINE_WINDOW_MS 内活跃、且是公共聊天室成员的用户。
+ * 注意与 memberCount（累计加入过的成员总数）区分——那个数字只增不减，不是在线数。
+ */
+route('GET', '/api/online-count', async (req, res, ctx) => {
+  const pub = db.publicRoom();
+  const memberIds = {};
+  for (const m of db.membersOf(pub.id)) memberIds[m.userId] = true;
+  let count = 0;
+  for (const u of db.list('users')) {
+    if (!memberIds[u.id]) continue;
+    if (u.id === ctx.user.id) { count++; continue; }     // 自己永远算在线
+    if ((u.lastSeen || 0) >= now() - ONLINE_WINDOW_MS) count++;
+  }
+  ok(res, { online: count, windowMs: ONLINE_WINDOW_MS, serverTime: now() });
+});
+
 
 /* ---------------- 我的存储配额 ---------------- */
 
@@ -1149,6 +1183,9 @@ route('GET', '/api/rooms', async (req, res, ctx) => {
   if (!db.isMember(pub.id, ctx.user.id)) db.addMember(pub.id, ctx.user.id, 'member');
   const all = db.listRooms();
   const mine = all.filter((r) => {
+    // 私聊不是房间：不进入房间列表。私聊只通过好友页 /api/dm/:userId 进入，
+    // 出现在房间列表里既不符合语义，也会误让人以为「房间=谁都能看到」。
+    if (r.kind === ROOM_DM) return false;
     if (r.id === pub.id) return true;
     if (db.isMember(r.id, ctx.user.id)) return true;
     if (r.kind === ROOM_GROUP && r.ownerId === ctx.user.id) return true;
@@ -1799,7 +1836,20 @@ route('GET', '/api/friends', async (req, res, ctx) => {
       createdAt: r.createdAt
     };
   });
-  ok(res, { friends, incoming, outgoing });
+  // 最近被对方同意的我发出的请求（7 天内）：用于「我发出的请求」入口的红点提示
+  const recentAccepted = db.byIdx('friendReqs', 'k1', ctx.user.id)
+    .filter((r) => r.status === 'accepted' && r.acceptedAt && r.acceptedAt >= now() - 7 * 24 * 60 * 60 * 1000)
+    .map((r) => {
+      const u = db.getUser(r.toId);
+      return {
+        id: r.id,
+        toId: r.toId,
+        username: u ? u.username : '未知',
+        nickname: u ? u.nickname : '未知',
+        acceptedAt: r.acceptedAt
+      };
+    });
+  ok(res, { friends, incoming, outgoing, recentAccepted });
 });
 
 route('POST', '/api/friends/request', async (req, res, ctx) => {
@@ -1830,6 +1880,7 @@ route('POST', '/api/friends/:id/accept', async (req, res, ctx) => {
   if (!r) return fail(res, 404, '请求不存在');
   if (r.toId !== ctx.user.id) return fail(res, 403, '无权操作');
   r.status = 'accepted';
+  r.acceptedAt = now();
   db.updateFriendRequest(r);
   db.addFriend(r.fromId, r.toId);
   ok(res, {});
@@ -1842,6 +1893,28 @@ route('POST', '/api/friends/:id/reject', async (req, res, ctx) => {
   r.status = 'rejected';
   db.updateFriendRequest(r);
   ok(res, {});
+});
+
+/**
+ * 我参与的所有私聊（仅本人可见，供前端同步 / 清除本机记录时枚举私聊 id）。
+ * 只返回「对方是谁 + 房间 id + 最后消息 rev」，绝不出现在房间列表或搜索里。
+ */
+route('GET', '/api/dm/list', async (req, res, ctx) => {
+  const mine = db.listRooms().filter((r) => r.kind === ROOM_DM && db.isMember(r.id, ctx.user.id));
+  const items = mine.map((r) => {
+    const other = db.membersOf(r.id).find((m) => m.userId !== ctx.user.id);
+    const u = other ? db.getUser(other.userId) : null;
+    const msgs = db.messagesOf(r.id);
+    let lastRev = 0;
+    msgs.forEach((m) => { const v = m.rev || m.seq || 0; if (v > lastRev) lastRev = v; });
+    return {
+      id: r.id,
+      userId: u ? u.id : (other ? other.userId : ''),
+      nickname: u ? (u.nickname || u.username) : '未知',
+      lastRev
+    };
+  });
+  ok(res, { items });
 });
 
 route('GET', '/api/dm/:userId', async (req, res, ctx) => {

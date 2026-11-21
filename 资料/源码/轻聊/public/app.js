@@ -13,11 +13,22 @@
   var KEEP_LOCAL_KEYS = ['ll_token', HIDDEN_REV_KEY, SEEN_REV_KEY, SETTINGS_KEY,
     THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY];
 
+  /** 任意值转非负整数（数字展示用；与基础版 num 同义） */
+  function num(v) {
+    var n = parseInt(v, 10);
+    return isNaN(n) ? 0 : n;
+  }
   function readNum(key) {
     var v = parseInt(localStorage.getItem(key) || '0', 10);
     return isNaN(v) ? 0 : v;
   }
   function writeNum(key, v) { localStorage.setItem(key, String(v)); }
+
+  /** 好友申请红点已读水位（本地）：收到申请看过的最大时间、已同意看过的最大时间 */
+  function readFriendSeen(key) { return readNum('ll_friend_seen_' + key); }
+  function writeFriendSeen(key, v) {
+    try { localStorage.setItem('ll_friend_seen_' + key, String(v)); } catch (e) { }
+  }
 
   function readHiddenRev() { return readNum(HIDDEN_REV_KEY); }
   function bumpSeenRev(rev) {
@@ -38,10 +49,14 @@
     friends: [],
     incoming: [],
     outgoing: [],
+    recentAccepted: [],           // 最近被同意的我发出的请求（红点用）
     profile: null,                // 当前查看的用户资料（申请加好友页）
     profileFrom: '',              // 资料页的来源：'main'（主界面）| 'chat'（聊天页）
     friendTimer: null,            // 好友视图的实时刷新定时器
     friendSig: '',                // 好友数据指纹，用来判断列表是否真的变了
+    onlineCount: 0,               // 公共聊天室同时在线人数（仅标准版）
+    onlineTimer: null,            // 在线人数刷新定时器（30秒）
+    pulseTimer: null,             // 心跳定时器（15秒）
     dmCache: {},
     uploading: null,
     hiddenRev: readHiddenRev(),  // 本机已隐藏的聊天记录水位
@@ -487,6 +502,8 @@
   }
 
   function api(method, path, body, cb) {
+    // 回调可选：心跳等「发完即走」的请求不传回调，统一在这里兜成空函数
+    var done = typeof cb === 'function' ? cb : function () { };
     var xhr = new XMLHttpRequest();
     xhr.open(method, path, true);
     xhr.timeout = 60000;
@@ -497,13 +514,13 @@
       var data = null;
       try { data = JSON.parse(xhr.responseText); } catch (e) { data = null; }
       if (xhr.status >= 200 && xhr.status < 300 && data && data.ok) {
-        cb(null, data);
+        done(null, data);
       } else {
-        cb(new Error((data && data.error) || ('请求失败(' + xhr.status + ')')), data);
+        done(new Error((data && data.error) || ('请求失败(' + xhr.status + ')')), data);
       }
     };
-    xhr.onerror = function () { cb(new Error('网络错误')); };
-    xhr.ontimeout = function () { cb(new Error('网络超时')); };
+    xhr.onerror = function () { done(new Error('网络错误')); };
+    xhr.ontimeout = function () { done(new Error('网络超时')); };
     // 显式发 UTF-8 字节，避免老内核用本地编码发中文
     xhr.send(body !== undefined && body !== null ? utf8Bytes(JSON.stringify(body)) : null);
   }
@@ -780,9 +797,19 @@
       S.version = d;
       if (!had && S.view === 'me') renderMe();
       if (S.view === 'public' && S.rooms.length) renderPublic();  // 公告到位后刷新公共入口页
+      // 【标准版专属】心跳 + 同时在线人数（基础版无此逻辑）
+      if (!S.pulseTimer) {
+        api('POST', '/api/pulse', {}, null);
+        S.pulseTimer = setInterval(function () { api('POST', '/api/pulse', {}, null); }, 15000);
+      }
+      if (!S.onlineTimer) {
+        refreshOnlineCount();
+        S.onlineTimer = setInterval(refreshOnlineCount, 30000);
+      }
     });
     loadStorage();
     loadRooms();
+    loadDMList();  // 私聊不属于房间；单独枚举以便「清除本机记录」能覆盖到
     switchView(S.view);
     // 深链进房：房间列表加载后自动打开
     if (S.deepRoom) {
@@ -853,6 +880,17 @@
     });
   }
 
+  /** 拉取我的私聊列表（不是房间），只填 dmCache 供清除本机记录使用，不在任何界面列出 */
+  function loadDMList() {
+    api('GET', '/api/dm/list', null, function (err, data) {
+      if (err || !data) return;
+      for (var i = 0; i < data.items.length; i++) {
+        var it = data.items[i];
+        if (it.userId && it.id) S.dmCache[it.userId] = it.id;
+      }
+    });
+  }
+
   /* ---------------- 视图：公共聊天室 ---------------- */
 
   /** 官方公告卡片：有内容才显示，空则完全不出现（数据来自 /api/version.announcement） */
@@ -877,8 +915,9 @@
       h += '<div class="card">' +
         '<div class="row" data-open="' + pub.id + '">' +
         '<div class="r-main"><div class="r-title">🌍 ' + esc(pub.name) +
-        '<span class="badge">全员可发言</span></div>' +
-        '<div class="r-sub">' + pub.memberCount + ' 人在线加入 · 所有登录用户均可发送文字/图片/视频/文件</div></div>' +
+        '<span class="badge">全员可发言</span>' +
+        '<span class="badge">' + num(S.onlineCount) + ' 人同时在线</span></div>' +
+        '<div class="r-sub">' + pub.memberCount + ' 人已加入 · 所有登录用户均可发送文字/图片/视频/文件</div></div>' +
         '<span style="color:#8b949e">›</span></div></div>';
       h += announcementHtml();
       h += '<div class="card"><div class="card-h">💡 提示</div>' +
@@ -909,6 +948,7 @@
     for (var i = 0; i < S.rooms.length; i++) {
       var r = S.rooms[i];
       if (r.kind === 'public') continue;
+      if (r.kind === 'dm') continue;  // 私聊不是房间，不进房间列表
       if (r.joined || r.ownerId === (S.user && S.user.id)) mine.push(r); else others.push(r);
     }
     h += '<div class="card"><div class="card-h">我已加入 / 我创建的 (' + mine.length + ')</div>';
@@ -1084,6 +1124,96 @@
     return a;
   }
 
+  /** 收到的好友申请：横条点开的弹窗（同意/拒绝直接在这里操作） */
+  function showIncoming() {
+    var box = el('div');
+    box.style.maxHeight = '52vh';
+    box.style.overflow = 'auto';
+    if (!S.incoming.length) {
+      box.appendChild(el('div', 'empty', '暂无收到的好友申请'));
+    } else {
+      for (var i = 0; i < S.incoming.length; i++) {
+        (function (r) {
+          var row = el('div', 'req-row');
+          row.appendChild(avatarEl(r.fromId || r.id, r.initial, r.avatarColor, null, r.avatar));
+          var main = el('div', 'r-main');
+          var title = el('div', 'r-title');
+          title.appendChild(el('span', 'nm', r.nickname));
+          title.appendChild(el('span', 'badge gray', r.username));
+          main.appendChild(title);
+          main.appendChild(el('div', 'req-msg' + (r.message ? '' : ' dim'), r.message || '（未填写附言）'));
+          main.appendChild(el('div', 'r-sub', '申请时间 ' + fmtAgo(r.createdAt)));
+          row.appendChild(main);
+          var acts = el('div', 'req-acts');
+          var okBtn = el('button', 'btn small primary', '同意');
+          okBtn.onclick = function () { acceptFriend(r.id); closeModal(); };
+          var noBtn = el('button', 'btn small ghost', '拒绝');
+          noBtn.onclick = function () { rejectFriend(r.id); closeModal(); };
+          acts.appendChild(okBtn); acts.appendChild(noBtn);
+          row.appendChild(acts);
+          box.appendChild(row);
+        })(S.incoming[i]);
+      }
+    }
+    openModal('收到的好友申请（' + S.incoming.length + '）', box, null, '关闭');
+    // 看过就消红点：把当前最大申请时间记为已读水位
+    var maxIn = 0;
+    for (var j = 0; j < S.incoming.length; j++) maxIn = Math.max(maxIn, num(S.incoming[j].createdAt));
+    if (maxIn > (readFriendSeen('in') || 0)) writeFriendSeen('in', maxIn);
+    updateFriendEntries();
+  }
+  /** 我发出的请求 + 最近被同意：横条点开的弹窗 */
+  function showOutgoing() {
+    var box = el('div');
+    box.style.maxHeight = '52vh';
+    box.style.overflow = 'auto';
+    if (S.recentAccepted.length) {
+      box.appendChild(el('div', 'card-h', '对方已同意'));
+      for (var i = 0; i < S.recentAccepted.length; i++) {
+        var a = S.recentAccepted[i];
+        box.appendChild(el('div', 'r-sub', '✓ ' + (a.nickname || a.username) + ' 已同意你的请求 · ' + fmtAgo(a.acceptedAt)));
+      }
+    }
+    box.appendChild(el('div', 'card-h', '等待对方同意（' + S.outgoing.length + '）'));
+    if (!S.outgoing.length) {
+      box.appendChild(el('div', 'empty', '暂无发出的好友请求'));
+    } else {
+      for (var j = 0; j < S.outgoing.length; j++) {
+        var o = S.outgoing[j];
+        var line = el('div', 'req-row');
+        var m = el('div', 'r-main');
+        m.appendChild(el('div', 'r-title', o.nickname + '  ' + o.username));
+        m.appendChild(el('div', 'r-sub', '等待对方同意 · ' + fmtAgo(o.createdAt)));
+        line.appendChild(m);
+        box.appendChild(line);
+      }
+    }
+    openModal('我发出的请求（' + S.outgoing.length + '）', box, null, '关闭');
+    var maxAcc = 0;
+    for (var k = 0; k < S.recentAccepted.length; k++) maxAcc = Math.max(maxAcc, num(S.recentAccepted[k].acceptedAt));
+    if (maxAcc > (readFriendSeen('acc') || 0)) writeFriendSeen('acc', maxAcc);
+    updateFriendEntries();
+  }
+
+  /** 只更新两个横条入口的红点/数量，不整页重绘 */
+  function updateFriendEntries() {
+    var seenIn = readFriendSeen('in') || 0, seenAcc = readFriendSeen('acc') || 0;
+    var newIn = 0, newAcc = 0, i;
+    for (i = 0; i < S.incoming.length; i++) if (num(S.incoming[i].createdAt) > seenIn) newIn++;
+    for (i = 0; i < S.recentAccepted.length; i++) if (num(S.recentAccepted[i].acceptedAt) > seenAcc) newAcc++;
+    var inRow = $('openIncoming'), outRow = $('openOutgoing');
+    if (inRow) {
+      inRow.innerHTML = '<span class="req-dot' + (newIn ? ' on' : '') + '"></span>' +
+        '📥 收到的好友申请 <span class="num">' + S.incoming.length + '</span>' +
+        (newIn ? '<span class="badge warn">新 ' + newIn + '</span>' : '');
+    }
+    if (outRow) {
+      outRow.innerHTML = '<span class="req-dot' + (newAcc ? ' on' : '') + '"></span>' +
+        '📤 我发出的请求 <span class="num">' + S.outgoing.length + '</span>' +
+        (newAcc ? '<span class="badge warn">新 ' + newAcc + '</span>' : '');
+    }
+  }
+
   function renderFriends() {
     var v = $('view');
     v.innerHTML = '';
@@ -1097,68 +1227,35 @@
     c0.appendChild(act);
     v.appendChild(c0);
 
-    // ---- 收到的好友申请 ----
+    // ---- 收到的申请 / 发出的请求：两个横条入口，点开弹窗查看 ----
+    // 红点口径：收到申请的时间 > 本地已看水位；被同意的时间 > 本地已看水位
+    var seenIn = readFriendSeen('in') || 0;
+    var seenAcc = readFriendSeen('acc') || 0;
+    var newIn = 0, newAcc = 0;
+    for (var q = 0; q < S.incoming.length; q++) {
+      if (num(S.incoming[q].createdAt) > seenIn) newIn++;
+    }
+    for (var q2 = 0; q2 < S.recentAccepted.length; q2++) {
+      if (num(S.recentAccepted[q2].acceptedAt) > seenAcc) newAcc++;
+    }
+
     var c1 = el('div', 'card');
-    c1.appendChild(el('div', 'card-h', '收到的好友申请 (' + S.incoming.length + ')'));
-    if (!S.incoming.length) {
-      c1.appendChild(el('div', 'empty', '暂无收到的好友申请'));
-    } else {
-      for (var i = 0; i < S.incoming.length; i++) {
-        var r = S.incoming[i];
-        var row = el('div', 'req-row');
+    var inRow = el('div', 'act req-entry');
+    inRow.id = 'openIncoming';
+    inRow.innerHTML = '<span class="req-dot' + (newIn ? ' on' : '') + '"></span>' +
+      '📥 收到的好友申请 <span class="num">' + S.incoming.length + '</span>' +
+      (newIn ? '<span class="badge warn">新 ' + newIn + '</span>' : '');
+    inRow.onclick = showIncoming;
+    c1.appendChild(inRow);
 
-        row.appendChild(avatarEl(r.fromId || r.id, r.initial, r.avatarColor, null, r.avatar));
-
-        var main = el('div', 'r-main');
-        var title = el('div', 'r-title');
-        title.appendChild(el('span', 'nm', r.nickname));
-        title.appendChild(el('span', 'badge gray', r.username));
-        main.appendChild(title);
-        main.appendChild(el('div', 'req-msg' + (r.message ? '' : ' dim'), r.message || '（未填写附言）'));
-        main.appendChild(el('div', 'r-sub', '申请时间 ' + fmtAgo(r.createdAt)));
-        row.appendChild(main);
-
-        var acts = el('div', 'req-acts');
-        var okBtn = el('button', 'btn small primary', '同意');
-        okBtn.setAttribute('data-accept', r.id);
-        okBtn.onclick = (function (id) {
-          return function () { acceptFriend(id); };
-        })(r.id);
-        var noBtn = el('button', 'btn small ghost', '拒绝');
-        noBtn.setAttribute('data-reject', r.id);
-        noBtn.onclick = (function (id) {
-          return function () { rejectFriend(id); };
-        })(r.id);
-        acts.appendChild(okBtn);
-        acts.appendChild(noBtn);
-        row.appendChild(acts);
-
-        c1.appendChild(row);
-      }
-    }
+    var outRow = el('div', 'act req-entry');
+    outRow.id = 'openOutgoing';
+    outRow.innerHTML = '<span class="req-dot' + (newAcc ? ' on' : '') + '"></span>' +
+      '📤 我发出的请求 <span class="num">' + S.outgoing.length + '</span>' +
+      (newAcc ? '<span class="badge warn">新 ' + newAcc + '</span>' : '');
+    outRow.onclick = showOutgoing;
+    c1.appendChild(outRow);
     v.appendChild(c1);
-
-    // ---- 我发出的请求 ----
-    var c2 = el('div', 'card');
-    c2.appendChild(el('div', 'card-h', '我发出的请求 (' + S.outgoing.length + ')'));
-    if (!S.outgoing.length) {
-      c2.appendChild(el('div', 'empty', '暂无发出的好友请求'));
-    } else {
-      for (var j = 0; j < S.outgoing.length; j++) {
-        var o = S.outgoing[j];
-        var orow = el('div', 'row');
-        orow.appendChild(avatarEl(o.toId || o.id, o.initial, o.avatarColor, null, o.avatar));
-        var omain = el('div', 'r-main');
-        var otitle = el('div', 'r-title');
-        otitle.appendChild(el('span', 'nm', o.nickname));
-        otitle.appendChild(el('span', 'badge gray', o.username));
-        omain.appendChild(otitle);
-        omain.appendChild(el('div', 'r-sub', '等待对方同意 · ' + fmtAgo(o.createdAt)));
-        orow.appendChild(omain);
-        c2.appendChild(orow);
-      }
-    }
-    v.appendChild(c2);
 
     // ---- 我的好友 ----
     var c3 = el('div', 'card');
@@ -1906,6 +2003,27 @@
     });
   }
 
+  /** 聊天页标题：公共聊天室在名字旁显示「N 人同时在线」（标准版专属） */
+  function updateChatTitle() {
+    if (!S.room) return;
+    var name = (S.roomTitle || roomNameById(S.room.id)) + (S.room.dissolved ? '（已解散）' : '');
+    if (S.room.id === S.publicRoomId || S.room.kind === 'public') {
+      name += '（' + num(S.onlineCount) + ' 人同时在线）';
+    }
+    $('chatTitle').textContent = name;
+  }
+
+  /** 拉取公共聊天室同时在线人数（标准版每 30 秒） */
+  function refreshOnlineCount() {
+    api('GET', '/api/online-count', null, function (err, d) {
+      if (err || !d) return;
+      S.onlineCount = num(d.online);
+      if (S.room && $('chat').className.indexOf('hide') < 0) updateChatTitle();
+      // 公共入口页卡片也带上在线数
+      if (S.view === 'public' && S.rooms.length) renderPublic();
+    });
+  }
+
   function openRoom(id, titleOverride) {
     api('GET', '/api/rooms/' + id + '/messages?since=0&limit=60', null, function (err, data) {
       if (err) {
@@ -1915,12 +2033,14 @@
       }
       S.room = data;
       S.room.id = id;
+      // 私聊不是房间、不在 S.rooms 里，标题用发起私聊时传入的对方昵称
+      S.roomTitle = titleOverride || '';
       S.lastRev = data.lastSeq;
       S.msgs = {};
       S.picked = {};
       S.selIds = {};
       $('msgs').innerHTML = '';
-      $('chatTitle').textContent = (titleOverride || roomNameById(id)) + (data.dissolved ? '（已解散）' : '');
+      updateChatTitle();  // 标题含公共聊天室同时在线人数
       $('main').className = 'screen hide';
       $('chat').className = 'screen chat-screen';
       for (var i = 0; i < data.messages.length; i++) appendMsg(data.messages[i], true);
@@ -3019,11 +3139,13 @@
   function loadFriends() {
     api('GET', '/api/friends', null, function (err, data) {
       if (err) { toast(err.message); return; }
-      var sig = friendSig(data.friends, data.incoming, data.outgoing);
+      var sig = friendSig(data.friends, data.incoming, data.outgoing) + '|' +
+        (data.recentAccepted || []).map(function (a) { return a.id + ':' + a.acceptedAt; }).join(',');
       var changed = (sig !== S.friendSig);
       S.friends = data.friends;
       S.incoming = data.incoming;
       S.outgoing = data.outgoing;
+      S.recentAccepted = data.recentAccepted || [];
       S.friendSig = sig;
       // 数据没变化就不重绘，避免切页面时闪一下
       if (changed) renderView();
@@ -3050,7 +3172,8 @@
       if (S.view !== 'friends') return;
       api('GET', '/api/friends', null, function (err, data) {
         if (err) return;
-        var sig = friendSig(data.friends, data.incoming, data.outgoing);
+        var sig = friendSig(data.friends, data.incoming, data.outgoing) + '|' +
+        (data.recentAccepted || []).map(function (a) { return a.id + ':' + a.acceptedAt; }).join(',');
         if (sig === S.friendSig) return;   // 没变化就不重绘
         S.friendSig = sig;
         S.friends = data.friends;
@@ -3096,6 +3219,7 @@
    */
   function openProfile(userId) {
     if (!userId) return;
+    closeModal();  // 从好友申请弹窗里点头像看资料时，先收起弹窗避免遮挡
     api('GET', '/api/users/' + encodeURIComponent(userId), null, function (err, data) {
       if (err) { toast(err.message); return; }
       S.profile = data;

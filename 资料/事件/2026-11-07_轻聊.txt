@@ -98,3 +98,14 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 新增 announcement.json(默认空) + /api/version.announcement；两版公共页在公共卡片与提示之间加官方公告位，有内容才显示空则隐藏；version 回调加公共页刷新
 · 以后加公告：编辑 announcement.json 的 enabled/title/content 即可（存一份）
 · 版本 2.4.4/code 21，changelog 15版；全量760/0；截图实测公告位顺序与显隐正确
+
+— 2026-11-21　v2.4.5 私聊不算房间 + 公告整框确认
+· 用户纠正：私聊只是两人对话，不是房间；房间别人看得到=暴露隐私。真正改：
+  - 后端 /api/rooms 过滤 kind=dm，私聊不进房间列表；/api/rooms/search 本就排除私聊
+  - canViewRoom 加私聊白名单：仅双方成员可读，最高权限也不能凭 id 围观（原无密码房直接放行=隐私漏洞）
+  - 新增 GET /api/dm/list 仅返本人私聊(id+对方昵称+lastRev)，供前端清本机记录覆盖私聊；注册在 /api/dm/:userId 之前
+  - 两版房间列表去掉私聊项/私聊标签；标准版 openRoom 用 titleOverride 记私聊标题(原来靠 S.rooms 找)；登录后 loadDMList 填 dmCache
+· 公告栏：用户澄清「无公告」=整个公告框都不显示。CDP 实测两版公共页无公告时均不含"公告"字样、只有公共卡片+提示 2 张卡 → 逻辑本就正确，确认无需改
+· 修复上轮好友横条改版遗留 bug：标准版缺 num() 定义、api() 空回调崩溃、弹窗点头像未收起遮挡资料页、测试仍按旧列表结构断言 → 已全部修复并更新 ui.js 测试
+· 隐私实测 15/0：房间列表无 dm、陌生人/最高权限不能读私聊、dm/list 只返本人、搜索不泄露；全量 765/0
+· 版本 2.4.5/code 22，changelog 16 版；源码已同步 资料/源码/轻聊/

@@ -448,14 +448,19 @@
   }
 
   function renderRooms() {
-    var h = '<div class="card"><div class="ch">全部房间（' + S.rooms.length + '）</div><div class="cb">';
-    if (!S.rooms.length) {
-      h += '<div class="empty">还没有房间</div>';
+    var roomTotal = 0;
+    for (var ri = 0; ri < S.rooms.length; ri++) if (S.rooms[ri].kind !== 'dm') roomTotal++;
+    var h = '<div class="card"><div class="ch">全部房间（' + roomTotal + '）</div><div class="cb">';
+    if (!roomTotal) {
+      h += '<div class="empty">还没有房间，到「好友」里可以给好友发私聊</div>';
     } else {
+      var shown = 0;
       for (var i = 0; i < S.rooms.length; i++) {
         var r = S.rooms[i];
-        var kindTxt = r.kind === 'public' ? '公共' : (r.kind === 'group' ? '群聊' : '私聊');
-        h += '<div class="line' + (i === S.rooms.length - 1 ? ' last' : '') + '">' +
+        if (r.kind === 'dm') continue;  // 私聊不是房间，不进房间列表
+        var kindTxt = r.kind === 'public' ? '公共' : '群聊';
+        shown++;
+        h += '<div class="line' + (shown === S.rooms.length ? ' last' : '') + '">' +
           '<div class="lm"><div class="lt">' + esc(r.name) + '</div>' +
           '<div class="ls">' + kindTxt + ' · ' + num(r.memberCount) + ' 人' +
           (r.dissolved ? ' · 已解散' : '') + (r.joined ? '' : ' · 未加入') + '</div></div>' +
