@@ -1,0 +1,9 @@
+{
+  "id": "washi",
+  "name": "暖纸 WASHI",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "2.6.0 暖纸存档版：米黄网点底、柔黄点缀，浅色暖纸/深色暖墨两套真配色",
+  "entry": "skin.css",
+  "preview": ""
+}

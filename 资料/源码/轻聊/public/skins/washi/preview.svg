@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <!-- 左：浅色（暖纸 + 黄） -->
+  <rect x="0" y="0" width="160" height="200" fill="#fff7e9"/>
+  <g fill="#ead9b5"><circle cx="8" cy="8" r="1"/><circle cx="32" cy="8" r="1"/><circle cx="56" cy="8" r="1"/><circle cx="80" cy="8" r="1"/><circle cx="104" cy="8" r="1"/><circle cx="128" cy="8" r="1"/><circle cx="152" cy="8" r="1"/><circle cx="8" cy="32" r="1"/><circle cx="32" cy="32" r="1"/><circle cx="56" cy="32" r="1"/><circle cx="80" cy="32" r="1"/><circle cx="104" cy="32" r="1"/><circle cx="128" cy="32" r="1"/><circle cx="152" cy="32" r="1"/></g>
+  <rect x="10" y="14" width="140" height="24" rx="6" fill="#ffd43b"/>
+  <text x="18" y="30" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#2b2a24">暖纸 WASHI</text>
+  <rect x="10" y="46" width="140" height="104" rx="8" fill="#fffdf8" stroke="#cdbf9f" stroke-width="1.5"/>
+  <rect x="10" y="46" width="140" height="22" rx="8" fill="#fff2bf"/>
+  <text x="18" y="61" font-family="Arial,sans-serif" font-size="9" fill="#5a4400">🌍 公共大厅</text>
+  <rect x="18" y="78" width="96" height="18" rx="6" fill="#fffdf8" stroke="#ded2b8" stroke-width="1"/>
+  <text x="24" y="90" font-family="Arial,sans-serif" font-size="8" fill="#5b574b">你好，这是公共大厅</text>
+  <rect x="46" y="102" width="96" height="18" rx="6" fill="#fff0b8"/>
+  <text x="52" y="114" font-family="Arial,sans-serif" font-size="8" fill="#2b2a24">收到！纸张风 ✓</text>
+  <text x="64" y="139" font-family="Arial,sans-serif" font-size="8" fill="#a87600">浅色 · 暖纸</text>
+  <rect x="10" y="164" width="140" height="18" rx="6" fill="#fffdf8" stroke="#cdbf9f" stroke-width="1"/>
+  <rect x="10" y="164" width="35" height="18" rx="6" fill="#fff0b8"/>
+  <text x="17" y="176" font-family="Arial,sans-serif" font-size="8" fill="#2b2a24">主页</text>
+  <text x="58" y="176" font-family="Arial,sans-serif" font-size="8" fill="#807a6b">房间</text>
+  <text x="100" y="176" font-family="Arial,sans-serif" font-size="8" fill="#807a6b">好友</text>
+
+  <!-- 右：深色（暖墨 + 黄） -->
+  <rect x="160" y="0" width="160" height="200" fill="#1c1c18"/>
+  <g fill="#34342b"><circle cx="168" cy="8" r="1"/><circle cx="192" cy="8" r="1"/><circle cx="216" cy="8" r="1"/><circle cx="240" cy="8" r="1"/><circle cx="264" cy="8" r="1"/><circle cx="288" cy="8" r="1"/><circle cx="312" cy="8" r="1"/><circle cx="168" cy="32" r="1"/><circle cx="192" cy="32" r="1"/><circle cx="216" cy="32" r="1"/><circle cx="240" cy="32" r="1"/><circle cx="264" cy="32" r="1"/><circle cx="288" cy="32" r="1"/><circle cx="312" cy="32" r="1"/></g>
+  <rect x="170" y="14" width="140" height="24" rx="6" fill="#2c2c24"/>
+  <text x="178" y="30" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#ffd43b">暖纸 WASHI</text>
+  <rect x="170" y="46" width="140" height="104" rx="8" fill="#26261f" stroke="#5b5b4c" stroke-width="1.5"/>
+  <rect x="170" y="46" width="140" height="22" rx="8" fill="#34342b"/>
+  <text x="178" y="61" font-family="Arial,sans-serif" font-size="9" fill="#ffd43b">🌍 公共大厅</text>
+  <rect x="178" y="78" width="96" height="18" rx="6" fill="#2c2c24" stroke="#46463a" stroke-width="1"/>
+  <text x="184" y="90" font-family="Arial,sans-serif" font-size="8" fill="#c9c1a9">你好，这是公共大厅</text>
+  <rect x="206" y="102" width="96" height="18" rx="6" fill="#4a4020"/>
+  <text x="212" y="114" font-family="Arial,sans-serif" font-size="8" fill="#f2ecd9">收到！暖墨风 ✓</text>
+  <text x="224" y="139" font-family="Arial,sans-serif" font-size="8" fill="#ffd43b">深色 · 暖墨</text>
+  <rect x="170" y="164" width="140" height="18" rx="6" fill="#26261f" stroke="#5b5b4c" stroke-width="1"/>
+  <rect x="170" y="164" width="35" height="18" rx="6" fill="#433a1c"/>
+  <text x="177" y="176" font-family="Arial,sans-serif" font-size="8" fill="#ffd43b">主页</text>
+  <text x="218" y="176" font-family="Arial,sans-serif" font-size="8" fill="#9d9580">房间</text>
+  <text x="260" y="176" font-family="Arial,sans-serif" font-size="8" fill="#9d9580">好友</text>
+</svg>

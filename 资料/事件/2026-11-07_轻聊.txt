@@ -177,3 +177,10 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 验证：本地/云端各 792/0；新增 CDP 脚本 tools/shot-skin-compare.js 实测浅色 body=rgb(255,247,233)、
   深色 body=rgb(28,28,24)、card-h 黄→深灰，两套确实不同；线上 /api/version=2.6.0、CSS 无 #11110f、示例 CSS 200
 · 发布 2.6.0/code29，链接不变
+
+· 2026-11-22 补充（2.6.1/code30）：用户指出 2.6.0 只是把 OPENWIRE 换色、且暖纸配色不满意，要求内置皮肤多做几套（后续会给参考案例）
+  - 把 2.6.0 暖纸配色从 openwire 中拆出，另存为独立内置皮肤 public/skins/washi/（暖纸 WASHI，浅色暖纸/深色暖墨）；
+    openwire 三个文件从 a11caca 还原为原始粗黑荧光黄，两套风格并存、可对比切换
+  - server.js builtin 数组加 washi 并还原 openwire 描述；test/skins.js 断言改为「washi 双配色无黑边 + openwire 保粗黑荧光黄 + 列表含 washi」
+  - 本地/云端各 794/0；线上 /api/version=2.6.1、washi CSS 200、openwire CSS 含 #11110f；已发布
+  - 用户后续会给更多参考案例，届时按「配色克制、少重复色」原则继续补内置皮肤

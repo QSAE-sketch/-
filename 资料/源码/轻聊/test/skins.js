@@ -72,11 +72,15 @@ function makeZip(files) {
   // 1. 内置皮肤
   let r = await req('GET', '/api/skins', null, ta);
   check('列表含内置 openwire', r.status === 200 && (r.json.skins || []).some((s) => s.id === 'openwire' && s.builtin), r.json);
+  check('列表含内置 washi（暖纸存档版）', (r.json.skins || []).some((s) => s.id === 'washi' && s.builtin), r.json);
   const builtin = (r.json.skins || []).find((s) => s.id === 'openwire');
   check('内置皮肤有预览图', !!(builtin && builtin.preview), builtin);
-  const builtinCss = fs.readFileSync(path.join(__dirname, '..', 'public', 'skins', 'openwire', 'skin.css'), 'utf8');
-  check('内置皮肤有真正的深色配色', /:root\[data-theme="dark"\]/.test(builtinCss) && /--bg:\s*#1c1c18/i.test(builtinCss));
-  check('内置皮肤不再用黑底大白边', !/#11110f/i.test(builtinCss) && !/background:\s*#000/i.test(builtinCss));
+  const readSkinCss = (id) => fs.readFileSync(path.join(__dirname, '..', 'public', 'skins', id, 'skin.css'), 'utf8');
+  const openwireCss = readSkinCss('openwire');
+  const washiCss = readSkinCss('washi');
+  check('washi 有真正的深色配色（非调亮度）', /:root\[data-theme="dark"\]/.test(washiCss) && /--bg:\s*#1c1c18/i.test(washiCss));
+  check('washi 不用黑底大白边', !/#11110f/i.test(washiCss) && !/background:\s*#000/i.test(washiCss));
+  check('openwire 保留原始粗黑荧光黄风格', /#11110f/i.test(openwireCss) && /#ffd43b/i.test(openwireCss));
 
   // 1b. 直接上传一份 CSS 就能做皮肤（自动生成 manifest 和预览图）
   const cssText = ':root{--bg:#abcdef}\n:root[data-theme="dark"]{--bg:#101010}';
