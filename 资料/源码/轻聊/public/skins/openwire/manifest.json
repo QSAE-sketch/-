@@ -1,0 +1,9 @@
+{
+  "id": "openwire",
+  "name": "天线 OPENWIRE",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "粗黑描边、硬阴影、米黄网点底 + 荧光黄主色，来自 openwire-chat 原型",
+  "entry": "skin.css",
+  "preview": ""
+}

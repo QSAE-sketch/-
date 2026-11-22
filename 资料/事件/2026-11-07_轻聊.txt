@@ -137,3 +137,17 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 编译 JDK17/D://jdk17 通过，轻聊.apk 2.4.8/code25 124744B；dex 校验含 AvatarLoader。模拟器(ql21 AVD)实测中途用户打断，测试账号 apkv970241(橙头像)已注销，ql_store.xml/apk1.png 已删，模拟器已关
 · v2.4.9：用户嫌网页底部导航难点 → 标准 .tb-btn padding 7/6→12/10 + min-height 52px + 字号 19/11→20/12；基础 td.nv padding 10→14、字号 13→14。两版可点区向上扩约 1/3
 · 已发布 2.4.9/code26，链接不变。测试跳过（用户明说 APK 改完不用测）
+
+— 2026-11-22　v2.5.0 皮肤系统（标准版）+ 主页改名 + 去网盘提示卡
+· 用户要求：去掉「我的」页云网盘提示卡；底部「公共」页改「主页」；主页加皮肤系统；把 Downloads/openwire-chat.html 风格做成内置皮肤可选+预览+一键切换；进一步做成通用——上传 ZIP 自制皮肤、可公开给所有人、要有规范+示例
+· 后端：新增 src/zipread.js（自写极简 ZIP 解析，Node 内置 zlib，支持 store/deflate，拒绝加密/路径穿越）；src/skins.js 注册路由：
+  GET /api/skins（内置+公开+本人私有）、POST /api/skins（二进制 ZIP≤3MB、manifest 校验、解压≤10MB、文件白名单）、
+  GET /api/skins/:id/file/:name（私有仅本人）、POST /api/skins/:id/public、DELETE /api/skins/:id（仅本人）
+  元数据 db('skins')，文件 DATA_DIR/skins/<id>/；内置 openwire 随源码发布，走静态 /skins/
+· 内置皮肤 public/skins/openwire/：skin.css 覆盖配色变量（米黄#fff4df/荧光黄#ffd43b/粗黑边/硬阴影）+ html[data-skin] 结构样式；preview.svg 预览图
+· 前端：app.js 加 SKIN_KEY=ll_skin，S.skins/S.skin；skinApply 注入 <link id=skinLink>+html[data-skin]；skinLoad 拉取；主页加「皮肤中心」入口；
+  openSkins 面板（列表/预览/使用/上传/设公开/删除/showSkinHelp 制作规范）；上传走 apiFile(二进制)；选择存 localStorage 自动恢复
+· 示例包 public/skins/example-skin.zip（2020B，manifest+skin.css+preview.svg+README），制作规范弹层可下载
+· 主页底部「公共」→「主页」，VIEW_TITLE public→主页（view key 不变，测试不受影响）；「我的」页删云网盘提示卡
+· 验证：皮肤专项 19/0（列表/上传/私密隔离/公开切换/非法manifest拒绝/内置文件/示例包/删除）；CDP 前端实测 11/11（入口/面板/应用后米黄底生效/预览/示例下载）；全量 784/0
+· 发布 2.5.0/code27，链接不变；线上 /api/version=2.5.0、内置CSS与示例包均 200

@@ -922,3 +922,38 @@ footer { color: var(--fg-3); }
   font-family: ui-monospace, Menlo, Consolas, monospace;
   resize: none; box-sizing: border-box;
 }
+
+/* ================================================================
+   皮肤中心（标准版）
+   ================================================================ */
+.skin-intro { font-size: 13px; color: var(--fg-2); line-height: 1.7; margin-bottom: 12px; }
+.skin-list { max-height: 46vh; overflow-y: auto; }
+.skin-card {
+  display: flex; gap: 12px; align-items: center; padding: 10px;
+  border: 1px solid var(--border); border-radius: 8px; margin-bottom: 9px;
+  background: var(--surface-2);
+}
+.skin-card.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.skin-pv {
+  width: 92px; height: 62px; flex: 0 0 92px; border-radius: 6px; overflow: hidden;
+  background: var(--surface-4); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+}
+.skin-pv img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.skin-pv-ph { font-size: 26px; font-weight: 700; color: var(--accent); }
+.skin-meta { flex: 1; min-width: 0; }
+.skin-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.skin-acts .mini-btn { padding: 4px 9px; }
+.skin-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.skin-tools .mini-btn { flex: 1; text-align: center; }
+.skin-preview-box { text-align: center; }
+.skin-preview-img { max-width: 100%; max-height: 50vh; border: 1px solid var(--border); border-radius: 8px; }
+.skin-help { font-size: 13px; line-height: 1.7; color: var(--fg-2); text-align: left; }
+.skin-help p { margin: 0 0 10px; }
+.skin-help pre {
+  background: var(--code-bg); color: var(--code-fg); border: 1px solid var(--code-border);
+  border-radius: 6px; padding: 10px 12px; overflow-x: auto; font-size: 12px;
+  line-height: 1.6; text-align: left; white-space: pre; margin: 6px 0 12px;
+}
+.skin-help code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+.skin-help .dim { color: var(--fg-4); font-size: 12px; }

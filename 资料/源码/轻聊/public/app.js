@@ -10,8 +10,9 @@
   var THEME_MODE_KEY = 'll_theme_mode';   // 主题模式：system | time | manual
   var THEME_PREF_KEY = 'll_theme_pref';   // 手动模式下的选择：light | dark
   var THEME_TIME_KEY = 'll_theme_time';   // 时间模式的阈值 {"d":7,"n":18}
+  var SKIN_KEY = 'll_skin';               // 当前皮肤 id（'' = 默认原版）
   var KEEP_LOCAL_KEYS = ['ll_token', HIDDEN_REV_KEY, SEEN_REV_KEY, SETTINGS_KEY,
-    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY];
+    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY, SKIN_KEY];
 
   /** 任意值转非负整数（数字展示用；与基础版 num 同义） */
   function num(v) {
@@ -66,7 +67,9 @@
     storage: null,               // 我的存储配额（/api/me/storage）
     netdiskUrl: '',              // 兼容字段：独立网盘已改为本站内置，恒为空
     version: null,               // /api/version 的返回（含 drive.enabled 等能力标记）
-    drive: null                  // 网盘界面状态（首次进入网盘页时初始化）
+    drive: null,                 // 网盘界面状态（首次进入网盘页时初始化）
+    skins: [],                   // 皮肤列表（标准版）
+    skin: localStorage.getItem(SKIN_KEY) || ''   // 当前应用的皮肤 id
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -320,6 +323,239 @@
     if (Theme.dayStart === Theme.nightStart) { themeSyncUI(); return; }  // 非法组合，不落盘
     themeSave();
     themeRefresh();
+  }
+
+  /* ================================================================
+     皮肤系统（标准版专属）
+     ----------------------------------------------------------------
+     皮肤 = 一份 CSS，通过 <link id="skinLink"> 覆盖变量 / 加结构样式。
+     应用时同步给 <html data-skin="id">，样式里的 [data-skin] 作用域生效。
+     选择存本机 localStorage，刷新后自动恢复；列表从 /api/skins 拉。
+     ================================================================ */
+
+  /** 应用皮肤；传空串恢复默认原版 */
+  function skinApply(id) {
+    S.skin = id || '';
+    try { localStorage.setItem(SKIN_KEY, S.skin); } catch (e) { }
+    var root = document.documentElement;
+    var link = $('skinLink');
+    if (S.skin) {
+      try { root.setAttribute('data-skin', S.skin); } catch (e) { }
+      if (!link) {
+        link = document.createElement('link');
+        link.id = 'skinLink';
+        link.rel = 'stylesheet';
+        var head = document.getElementsByTagName('head')[0];
+        if (head) head.appendChild(link);
+      }
+      var item = null;
+      for (var i = 0; i < S.skins.length; i++) {
+        if (S.skins[i].id === S.skin) { item = S.skins[i]; break; }
+      }
+      link.href = item ? item.url : '';
+    } else {
+      try { root.removeAttribute('data-skin'); } catch (e2) { }
+      if (link && link.parentNode) link.parentNode.removeChild(link);
+    }
+  }
+
+  /** 从服务器拉皮肤列表；静默失败（皮肤是增强功能，不该拖垮主流程） */
+  function skinLoad(cb) {
+    api('GET', '/api/skins', null, function (err, data) {
+      if (!err && data && data.skins) S.skins = data.skins;
+      // 若当前皮肤已被删除，自动退回默认
+      if (S.skin) {
+        var found = false;
+        for (var i = 0; i < S.skins.length; i++) {
+          if (S.skins[i].id === S.skin) { found = true; break; }
+        }
+        if (!found) skinApply('');
+      } else {
+        skinApply(S.skin);
+      }
+      if (typeof cb === 'function') cb();
+    });
+  }
+
+  function skinFind(id) {
+    for (var i = 0; i < S.skins.length; i++) if (S.skins[i].id === id) return S.skins[i];
+    return null;
+  }
+
+  /** 皮肤面板：预览图 + 应用 + 上传 + 公开/删除 */
+  function openSkins() {
+    var h = '<div class="skin-intro">给界面换一套外观。点「预览」看效果，点「使用」立即切换；' +
+      '自己的皮肤可设为公开给大家用，也可上传 ZIP 包制作新皮肤。</div>' +
+      '<div class="skin-list" id="skinList">加载中…</div>' +
+      '<div class="skin-tools">' +
+      '<label class="mini-btn" for="skinUpload">📦 上传皮肤 ZIP</label>' +
+      '<input type="file" id="skinUpload" accept=".zip,application/zip" style="display:none">' +
+      '<div class="mini-btn" id="skinHelp">📖 制作规范</div></div>' +
+      '<div class="r-sub" id="skinUploadTip" style="padding:8px 2px 0"></div>';
+    openModal('皮肤中心', h, null, '关闭');
+    renderSkinList();
+    $('skinUpload').onchange = function () {
+      var f = this.files && this.files[0];
+      if (!f) return;
+      skinUpload(f);
+      this.value = '';
+    };
+    $('skinHelp').onclick = showSkinHelp;
+  }
+
+  function renderSkinList() {
+    var box = $('skinList');
+    if (!box) return;
+    if (!S.skins.length) { box.innerHTML = '<div class="empty">还没有皮肤</div>'; return; }
+    var h = '';
+    for (var i = 0; i < S.skins.length; i++) {
+      var s = S.skins[i];
+      var active = S.skin === s.id;
+      h += '<div class="skin-card' + (active ? ' on' : '') + '">' +
+        '<div class="skin-pv">' +
+        (s.preview
+          ? '<img src="' + esc(s.preview) + '" alt="预览">'
+          : '<span class="skin-pv-ph">' + esc(s.name.slice(0, 1)) + '</span>') +
+        '</div>' +
+        '<div class="skin-meta">' +
+        '<div class="r-title">' + esc(s.name) + (active ? '<span class="badge">使用中</span>' : '') + '</div>' +
+        '<div class="r-sub">' + esc(s.description || s.author || '') +
+        ' · v' + esc(s.version) + (s.builtin ? ' · 内置' : (s.isPublic ? ' · 公开' : ' · 私密')) + '</div>' +
+        '<div class="skin-acts">' +
+        (active ? '' : '<span class="mini-btn" data-skin-use="' + esc(s.id) + '">使用</span>') +
+        '<span class="mini-btn" data-skin-preview="' + esc(s.id) + '">预览</span>' +
+        (s.mine && !s.builtin
+          ? '<span class="mini-btn" data-skin-public="' + esc(s.id) + '">' + (s.isPublic ? '转私密' : '设公开') + '</span>' +
+            '<span class="mini-btn danger" data-skin-del="' + esc(s.id) + '">删除</span>'
+          : '') +
+        '</div></div></div>';
+    }
+    box.innerHTML = h;
+    var uses = box.querySelectorAll('[data-skin-use]');
+    for (var u = 0; u < uses.length; u++) {
+      uses[u].onclick = function () {
+        skinApply(this.getAttribute('data-skin-use'));
+        toast('已切换到「' + (skinFind(S.skin) || {}).name + '」');
+        renderSkinList();
+      };
+    }
+    var pvs = box.querySelectorAll('[data-skin-preview]');
+    for (var p = 0; p < pvs.length; p++) {
+      pvs[p].onclick = function () { showSkinPreview(this.getAttribute('data-skin-preview')); };
+    }
+    var pubs = box.querySelectorAll('[data-skin-public]');
+    for (var g = 0; g < pubs.length; g++) {
+      pubs[g].onclick = function () {
+        var el = this, id = el.getAttribute('data-skin-public');
+        var sk = skinFind(id);
+        if (!sk) return;
+        var body = { isPublic: !sk.isPublic };
+        apiPostBinary('/api/skins/' + encodeURIComponent(id) + '/public', body, function (err) {
+          if (err) { toast(err.message); return; }
+          skinLoad(function () { renderSkinList(); });
+        });
+      };
+    }
+    var dels = box.querySelectorAll('[data-skin-del]');
+    for (var d = 0; d < dels.length; d++) {
+      dels[d].onclick = function () {
+        var id = this.getAttribute('data-skin-del');
+        var sk = skinFind(id);
+        openModal('删除皮肤', '确定删除「' + esc(sk ? sk.name : id) + '」吗？已应用此皮肤的设备会自动恢复默认。', function () {
+          api('DELETE', '/api/skins/' + encodeURIComponent(id), null, function (err) {
+            if (err) { toast(err.message); return; }
+            skinLoad(function () { renderSkinList(); });
+            toast('已删除');
+          });
+        }, '删除');
+      };
+    }
+  }
+
+  /** 以二进制体发 JSON（后端 public 切换接口用 readBinary 读） */
+  function apiPostBinary(path, obj, cb) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', path, true);
+    xhr.timeout = 30000;
+    if (S.token) xhr.setRequestHeader('X-Token', S.token);
+    xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      var data = null;
+      try { data = JSON.parse(xhr.responseText); } catch (e) { }
+      if (xhr.status >= 200 && xhr.status < 300 && data && data.ok) cb(null, data);
+      else cb(new Error((data && data.error) || ('请求失败(' + xhr.status + ')')));
+    };
+    xhr.send(utf8Bytes(JSON.stringify(obj)));
+  }
+
+  /** 预览：弹层里放一张放大预览图 + 说明，应用后整站即变此风格 */
+  function showSkinPreview(id) {
+    var sk = skinFind(id);
+    if (!sk) return;
+    var h = '<div class="skin-preview-box">';
+    if (sk.preview) h += '<img class="skin-preview-img" src="' + esc(sk.preview) + '" alt="皮肤预览">';
+    else h += '<div class="empty">这个皮肤没有预览图</div>';
+    h += '<div class="r-sub" style="padding:10px 2px 0;line-height:1.7">' +
+      esc(sk.name) + ' · v' + esc(sk.version) + '<br>' + esc(sk.description || '') +
+      '<br>点「使用」后整个界面立即切换成这套风格。</div></div>';
+    openModal('皮肤预览', h, function () {
+      skinApply(id);
+      toast('已应用「' + sk.name + '」');
+      renderSkinList();
+    }, '使用这个皮肤');
+  }
+
+  /** 上传 ZIP 皮肤 */
+  function skinUpload(file) {
+    if (!/\.zip$/i.test(file.name)) { toast('请选择 .zip 皮肤包'); return; }
+    if (file.size > 3 * 1024 * 1024) { toast('皮肤包不能超过 3MB'); return; }
+    var tip = $('skinUploadTip');
+    if (tip) tip.textContent = '上传中…';
+    apiFile('POST', '/api/skins', file, function (loaded, total) {
+      if (tip && total) tip.textContent = '上传中 ' + Math.round(loaded * 100 / total) + '%';
+    }, function (err, data) {
+      if (err) {
+        if (tip) tip.textContent = '';
+        toast(err.message);
+        return;
+      }
+      if (tip) tip.textContent = '上传成功：' + (data.skin ? data.skin.name : '');
+      skinLoad(function () { renderSkinList(); });
+    });
+  }
+
+  /** 制作规范（ZIP 里该放什么、怎么改） */
+  function showSkinHelp() {
+    var h = '<div class="skin-help">' +
+      '<p><b>皮肤包就是一个 ZIP</b>，解压后根目录必须有 <code>manifest.json</code>，' +
+      '再放一份 CSS（默认 <code>skin.css</code>），可选预览图与字体/图片。</p>' +
+      '<pre>' +
+      'my-skin/\n' +
+      '├─ manifest.json   ← 必填，皮肤信息\n' +
+      '├─ skin.css        ← 必填，样式\n' +
+      '├─ preview.png     ← 可选，预览图\n' +
+      '└─ images/…        ← 可选，CSS 里引用\n' +
+      '</pre>' +
+      '<p><b>manifest.json 示例：</b></p>' +
+      '<pre>{\n' +
+      '  "id": "my-skin",\n' +
+      '  "name": "我的皮肤",\n' +
+      '  "version": "1.0.0",\n' +
+      '  "author": "你的名字",\n' +
+      '  "description": "一句话介绍",\n' +
+      '  "entry": "skin.css",\n' +
+      '  "preview": "preview.png"\n' +
+      '}</pre>' +
+      '<p><b>换配色</b>：在 CSS 里覆盖变量即可，例如 <code>:root{--accent:#ffd43b;' +
+      '--bg:#fff4df;--surface:#fffdf7}</code>。</p>' +
+      '<p><b>改结构</b>：用 <code>html[data-skin="my-skin"] .card{…}</code> 这种选择器写任意样式，' +
+      '只对你这套皮肤生效。</p>' +
+      '<p class="dim">id 只能用小写字母/数字/横线；ZIP ≤ 3MB，解压后 ≤ 10MB；' +
+      '只允许 css/png/jpg/gif/webp/svg/字体/json/txt 文件。上传后默认私密，可在列表里设公开。</p>' +
+      '<p><a class="btn small" href="/skins/example-skin.zip" download="示例皮肤包.zip">⬇ 下载示例皮肤包</a></p>' +
+      '</div>';
+    openModal('皮肤制作规范', h, null, '知道了');
   }
 
   function themeStart() {
@@ -810,6 +1046,11 @@
     loadStorage();
     loadRooms();
     loadDMList();  // 私聊不属于房间；单独枚举以便「清除本机记录」能覆盖到
+    skinLoad(function () {
+      // 恢复本机保存的皮肤（列表到位后才能拿到 CSS 地址）
+      skinApply(S.skin);
+      if (S.view === 'public') renderPublic();
+    });
     switchView(S.view);
     // 深链进房：房间列表加载后自动打开
     if (S.deepRoom) {
@@ -841,7 +1082,7 @@
   }
 
   var VIEW_TITLE = {
-    public: '公共聊天室',
+    public: '主页',
     rooms: '我的房间',
     friends: '好友',
     me: '我的',
@@ -926,11 +1167,19 @@
         '单文件上限 200MB，支持分片上传与断点续传。<br>' +
         '消息发送后 2 分钟内可撤回；删除仅对自己隐藏；直接删除可随时彻底清除。</div></div>';
     }
+    /* 皮肤中心：标准版专属，换整站外观 */
+    h += '<div class="card"><div class="card-h">🎨 皮肤</div>' +
+      '<div class="act" data-skin-open>' +
+      '皮肤中心' + (S.skin ? ' · 当前「' + esc((skinFind(S.skin) || {}).name || S.skin) + '」' : ' · 当前原版') +
+      '</div></div>';
+
     h += '<div class="card"><div class="card-h">🚪 其他入口</div>' +
       '<div class="act" data-go="rooms">进入「我的房间」→ 创建或加入自定义房间</div>' +
       '<div class="act" data-go="friends">进入「好友」→ 添加好友并发起私聊</div></div>';
     $('view').innerHTML = h;
     bindView();
+    var skinEntry = $('view').querySelector('[data-skin-open]');
+    if (skinEntry) skinEntry.onclick = openSkins;
   }
 
   /* ---------------- 视图：房间 ---------------- */
@@ -1356,14 +1605,6 @@
       '" style="width:' + pct + '%"></div></div>' +
       '<div class="r-sub">每个账号 2GB 配额，超出后无法上传新文件；删除文件即可释放空间</div>' +
       '</div></div>';
-
-    /* 云网盘：本站内置，直接切到网盘视图 */
-    if (S.version && S.version.drive && S.version.drive.enabled !== false) {
-      h += '<div class="card"><div class="card-h">云网盘</div>' +
-        '<div class="act" id="openNetdisk">📁 我的网盘</div>' +
-        '<div class="r-sub" style="padding:0 13px 11px;white-space:normal">' +
-        '聊天里发出的文件天然就在网盘里；网盘也支持上传、下载、分享与回收站。</div></div>';
-    }
 
     h += '<div class="card"><div class="card-h">功能说明</div>' +
       '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.8">' +

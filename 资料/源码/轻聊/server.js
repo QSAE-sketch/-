@@ -1792,6 +1792,20 @@ const drive = require('./src/drive')({
   route, db, files, perm, ok, fail, readJson, now, fmtSize, storageInfo, clampInt
 });
 
+/* ---------------- 皮肤系统（标准版） ----------------
+ * 皮肤包 = ZIP，元数据进 db('skins')，文件落地 DATA_DIR/skins/。
+ * 内置 openwire 皮肤随源码发布，走静态 /skins/ 路径。
+ */
+const SKIN_DIR = path.join(DATA_DIR, 'skins');
+require('./src/skins').registerSkins({
+  route, db, ok, fail, readBinary, DATA_DIR, SKIN_DIR, PUBLIC_DIR,
+  builtin: [{
+    id: 'openwire', name: '天线 OPENWIRE', version: '1.0.0',
+    author: '系统内置', description: '粗黑描边 · 硬阴影 · 米黄网点底 · 荧光黄主色',
+    entry: 'skin.css', files: ['skin.css', 'manifest.json', 'preview.svg']
+  }]
+});
+
 /* ---------------- 好友 / 私聊 ---------------- */
 
 route('GET', '/api/friends', async (req, res, ctx) => {

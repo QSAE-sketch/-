@@ -1,0 +1,151 @@
+/* 天线 OPENWIRE 皮肤 —— 粗黑描边 + 硬阴影 + 米黄底 + 荧光黄主色
+ * 只覆盖变量即可换肤；结构微调统一放在 html[data-skin="openwire"] 作用域。
+ */
+
+:root, html[data-skin="openwire"] {
+  color-scheme: light;
+
+  --bg: #fff4df;
+  --surface: #fffdf7;
+  --surface-2: #fff8e8;
+  --surface-3: #fff1d4;
+  --surface-4: #f3e7cc;
+
+  --fg: #11110f;
+  --fg-2: #4d4b44;
+  --fg-3: #6f6b5f;
+  --fg-4: #8d887a;
+  --fg-5: #a39c8a;
+  --ph: #9a9280;
+
+  --border: #11110f;
+  --border-2: #d8cdb2;
+  --border-3: #11110f;
+  --border-4: #e6d9bb;
+
+  --accent: #11110f;
+  --accent-2: #000000;
+  --accent-soft: #fff2a8;
+  --accent-soft-border: #11110f;
+  --accent-ring: rgba(255, 212, 59, .7);
+  --on-accent: #11110f;
+  --danger: #d63457;
+  --danger-2: #a51e3c;
+  --warn: #b46900;
+
+  --topbar-bg: #ffd43b;
+  --topbar-fg: #11110f;
+  --tabbar-bg: #fffdf7;
+  --bubble: #fffdf7;
+  --bubble-mine: #ffd43b;
+  --bubble-fg: #11110f;
+  --bubble-who: #6f6b5f;
+  --bubble-meta: #8d887a;
+  --av-fg: #11110f;
+  --pick-bg: #fffdf7;
+  --pick-border: #11110f;
+  --pick-on: #11110f;
+  --up-bg: #fff2a8;
+  --up-fg: #6b5b00;
+  --up-track: #e6d9bb;
+  --up-fill: #ffd43b;
+  --toast-bg: #11110f;
+  --toast-fg: #fff4df;
+  --badge-bg: #c9f0a0;
+  --badge-fg: #11110f;
+  --badge-gray-bg: #e6d9bb;
+  --badge-gray-fg: #4d4b44;
+  --badge-warn-bg: #ff6ca8;
+  --badge-warn-fg: #11110f;
+  --role-4-bg: #ff6ca8; --role-4-fg: #11110f;
+  --role-3-bg: #ffd43b; --role-3-fg: #11110f;
+  --role-2-bg: #a9d6ff; --role-2-fg: #11110f;
+  --role-1-bg: #c9f0a0; --role-1-fg: #11110f;
+  --role-0-bg: #e6d9bb; --role-0-fg: #4d4b44;
+  --mact-off: #b9ad91;
+
+  --link: #b33000;
+  --link-hover: #8a2400;
+  --code-bg: #fff8e8;
+  --code-fg: #11110f;
+  --code-border: #11110f;
+
+  --shadow: 4px 4px 0 #11110f;
+}
+
+/* ---- 结构：粗边框 + 硬阴影 ---- */
+html[data-skin="openwire"], html[data-skin="openwire"] body {
+  background-color: var(--bg);
+  background-image: radial-gradient(#e6d7ba 1.1px, transparent 1.1px);
+  background-size: 22px 22px;
+  font-family: "Archivo Black", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html[data-skin="openwire"] .topbar {
+  border-bottom: 3px solid #11110f;
+}
+html[data-skin="openwire"] .tb-title {
+  font-weight: 900;
+  letter-spacing: -.01em;
+}
+html[data-skin="openwire"] .card {
+  border: 2.5px solid #11110f;
+  border-radius: 2px;
+  box-shadow: 4px 4px 0 #11110f;
+  margin: 12px 10px 16px;
+}
+html[data-skin="openwire"] .card-h {
+  background: #11110f;
+  color: #fff4df;
+  border-bottom: 2.5px solid #11110f;
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+html[data-skin="openwire"] .row:active,
+html[data-skin="openwire"] .act:active {
+  background: #fff2a8;
+}
+html[data-skin="openwire"] .act {
+  font-weight: 700;
+  color: #11110f;
+  border-bottom: 2px solid #11110f;
+}
+html[data-skin="openwire"] .btn,
+html[data-skin="openwire"] .inp,
+html[data-skin="openwire"] .msg-box,
+html[data-skin="openwire"] input[type=text],
+html[data-skin="openwire"] input[type=password],
+html[data-skin="openwire"] textarea {
+  border: 2px solid #11110f;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 #11110f;
+}
+html[data-skin="openwire"] .btn.primary {
+  background: #ffd43b;
+  color: #11110f;
+  font-weight: 800;
+}
+html[data-skin="openwire"] .btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #11110f;
+}
+html[data-skin="openwire"] .tabbar {
+  border-top: 3px solid #11110f;
+}
+html[data-skin="openwire"] .tb-btn {
+  font-weight: 800;
+  border-right: 2px solid #11110f;
+}
+html[data-skin="openwire"] .tb-btn:last-child { border-right: 0; }
+html[data-skin="openwire"] .tb-btn.active {
+  background: #ffd43b;
+  color: #11110f;
+}
+html[data-skin="openwire"] .badge {
+  border: 1.5px solid #11110f;
+  font-weight: 700;
+}
+html[data-skin="openwire"] .row-av {
+  border: 2px solid #11110f;
+  box-shadow: 2px 2px 0 #11110f;
+}
