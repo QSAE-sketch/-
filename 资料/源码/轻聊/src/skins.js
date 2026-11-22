@@ -133,10 +133,17 @@ function registerSkins(deps) {
       }
     }
   }
-  ensureBuiltin();
+  // 注意：不能在注册时调用。server.js 里注册发生在 initStore() 之前，此时
+  // store 还指向本地库；云端后端加载完成后内存镜像会被云端数据覆盖，导致
+  // 线上 skins 集合为空、皮肤中心看不到内置皮肤。改为每个请求进来时幂等补齐，
+  // 这样无论当前生效的是哪个后端（含运行中降级/切换）都能拿到内置皮肤。
+  function ensureReady() {
+    try { ensureBuiltin(); } catch (e) { /* 皮肤是增强功能，初始化失败不阻断请求 */ }
+  }
 
   /** 列表：内置 + 全部公开 + 本人私有 */
   route('GET', '/api/skins', async (req, res, ctx) => {
+    ensureReady();
     const all = db.list('skins');
     const mine = all.filter((s) => s.builtin || s.isPublic || (ctx.user && s.ownerId === ctx.user.id));
     mine.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
@@ -145,6 +152,7 @@ function registerSkins(deps) {
 
   /** 上传皮肤 ZIP（二进制 body，Content-Type: application/zip） */
   route('POST', '/api/skins', async (req, res, ctx) => {
+    ensureReady();
     let buf;
     try { buf = await readBinary(req, MAX_ZIP); }
     catch (e) { return fail(res, 413, '皮肤包超过 3MB 上限'); }
@@ -180,6 +188,7 @@ function registerSkins(deps) {
 
   /** 取皮肤内的文件；私有皮肤仅本人可读 */
   route('GET', '/api/skins/:id/file/:name', async (req, res, ctx) => {
+    ensureReady();
     const s = db.get('skins', ctx.params.id);
     if (!s) return fail(res, 404, '皮肤不存在');
     if (!s.isPublic && !s.builtin && (!ctx.user || s.ownerId !== ctx.user.id)) {
@@ -218,6 +227,7 @@ function registerSkins(deps) {
 
   /** 公开/私有切换：仅本人 */
   route('POST', '/api/skins/:id/public', async (req, res, ctx) => {
+    ensureReady();
     const s = db.get('skins', ctx.params.id);
     if (!s || s.builtin) return fail(res, 404, '皮肤不存在');
     if (s.ownerId !== ctx.user.id) return fail(res, 403, '只能管理自己的皮肤');
@@ -231,6 +241,7 @@ function registerSkins(deps) {
 
   /** 删除皮肤：仅本人 */
   route('DELETE', '/api/skins/:id', async (req, res, ctx) => {
+    ensureReady();
     const s = db.get('skins', ctx.params.id);
     if (!s || s.builtin) return fail(res, 404, '皮肤不存在');
     if (s.ownerId !== ctx.user.id) return fail(res, 403, '只能删除自己的皮肤');

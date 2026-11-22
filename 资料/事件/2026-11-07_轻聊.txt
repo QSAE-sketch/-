@@ -151,3 +151,14 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 主页底部「公共」→「主页」，VIEW_TITLE public→主页（view key 不变，测试不受影响）；「我的」页删云网盘提示卡
 · 验证：皮肤专项 19/0（列表/上传/私密隔离/公开切换/非法manifest拒绝/内置文件/示例包/删除）；CDP 前端实测 11/11（入口/面板/应用后米黄底生效/预览/示例下载）；全量 784/0
 · 发布 2.5.0/code27，链接不变；线上 /api/version=2.5.0、内置CSS与示例包均 200
+
+— 2026-11-22　v2.5.1 修复皮肤中心空白 + 「我的」外观行点不动
+· 用户反馈：主页皮肤中心一个皮肤也没有；「我的」页「🎨 外观」那行点不了
+· 根因①（皮肤空白）：src/skins.js 的 ensureBuiltin() 在 registerSkins（模块加载）时执行，此时 server.js 的 store 还指向本地库；
+  initStore() 完成后 activeStore 切到 workbuddy-cloud，内存镜像由云端 docs 重建，云端 skins 集合为空（SQL 实测 0 条）→ 列表空
+  → 改为 ensureReady() 在每个皮肤路由入口幂等补齐，与当前后端无关；顺带避免用户上传撞内置 id
+· 根因②（外观点不动）：renderMe() 只 querySelector 绑了第一个 data-go=settings，第二个「🎨 外观」是死链
+  → 外观行改独立 id=openAppearance 直接 openThemeModal()；设置行改 querySelectorAll 全量绑定；test/ui.js DOM 桩同步加 _qsa
+· 验证：npm test(local) 784/0、npm run test:cloud 784/0（云端专项含「列表含内置 openwire」通过，测试自建 292 条已清理）；
+  线上 /api/version=2.5.1、app.js 含 openAppearance
+· 发布 2.5.1/code28，链接不变

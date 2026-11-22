@@ -1621,12 +1621,16 @@
       '<a href="mailto:' + esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '">' +
       esc(S.contact || (S.version && S.version.contact) || 'ngkz5993@agent.qq.com') + '</a></div></div>';
     h += '<div class="card"><div class="act" data-go="settings">⚙️ 设置 · 缓存 / 聊天记录 / 下载路径</div></div>';
-    h += '<div class="card"><div class="act" data-go="settings">🎨 外观 · 当前主题：' + themeLabel() + '</div></div>';
+    h += '<div class="card"><div class="act" id="openAppearance">🎨 外观 · 当前主题：' + themeLabel() + '</div></div>';
     h += '<div class="card"><div class="act danger" id="logout">退出登录</div></div>';
     h += '<div class="card"><div class="act danger" id="deleteAccount">注销账号（不可恢复）</div></div>';
     $('view').innerHTML = h;
-    var setEntry = $('view').querySelector('[data-go="settings"]');
-    if (setEntry) setEntry.onclick = function () { openSettings(); };
+    // 用 querySelectorAll：以前只绑了第一个 data-go=settings，「外观」行是死链
+    var setEntries = $('view').querySelectorAll('[data-go="settings"]');
+    for (var se = 0; se < setEntries.length; se++) {
+      setEntries[se].onclick = function () { openSettings(); };
+    }
+    bind('openAppearance', openThemeModal);
     var clEntry = $('viewChangelog');
     if (clEntry) clEntry.onclick = showChangelog;
     bind('editNick', doChangeNickname);

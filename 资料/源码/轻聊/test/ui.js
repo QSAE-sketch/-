@@ -56,6 +56,8 @@ class El {
   querySelectorAll(sel) {
     // 模拟 innerHTML 渲染出来的房间行（bindView 会给它绑定 openRoom）
     if (sel === '[data-open]') return roomRows;
+    // 「我的」页可能有多行 data-go=settings（设置 / 外观），统一批量绑定
+    if (this._qsa && this._qsa[sel]) return this._qsa[sel];
     // 按 id 查（真实 DOM 构建出来的资料页元素）
     if (sel.charAt(0) === '#') {
       const id = sel.slice(1);
@@ -155,6 +157,7 @@ const navBtns = ['public', 'rooms', 'friends', 'me'].map((v) => {
 const settingsEntry = new El('div');
 settingsEntry.setAttribute('data-go', 'settings');
 registry.view._qs = { '[data-go="settings"]': settingsEntry };
+registry.view._qsa = { '[data-go="settings"]': [settingsEntry] };
 
 // 房间行：模拟房间列表渲染出来的 [data-open] 元素，bindView 会给它绑定 openRoom
 const roomRows = [];
