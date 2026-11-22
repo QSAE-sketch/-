@@ -1,0 +1,185 @@
+/* 薄荷 MINT 皮肤 —— 浅色/深色两套同色系配色，深色不是调亮度。
+ * 配色克制：一个主色 + 中性面，避免同屏堆砌多种颜色。
+ * 字体/圆角体现原风格：sans / 18px。
+ */
+:root {
+  color-scheme: light;
+  --bg: #dff3e8;
+  --surface: #eafaf1;
+  --fg: #132018;
+  --surface-2: #e5f7ed;
+  --surface-3: #d2edde;
+  --surface-4: #cdeada;
+  --fg-2: #3d5245;
+  --fg-3: #5f7a69;
+  --fg-4: #7b9585;
+  --fg-5: #95ad9e;
+  --ph: #7b9585;
+  --border: #bfe3ce;
+  --border-2: #d9f1e3;
+  --border-3: #a0c0ad;
+  --border-4: #e1f5e9;
+  --accent: #178a5a;
+  --accent-2: #16774e;
+  --accent-soft: #d1eddf;
+  --accent-soft-border: #afdbc7;
+  --accent-ring: rgba(23, 138, 90, 0.35);
+  --on-accent: #ffffff;
+  --danger: #c23345;
+  --danger-2: #9c2535;
+  --warn: #a3701a;
+  --topbar-bg: #178a5a;
+  --topbar-fg: #ffffff;
+  --tabbar-bg: #eafaf1;
+  --bubble: #eafaf1;
+  --bubble-mine: #c8e8d9;
+  --bubble-fg: #132018;
+  --bubble-who: #5f7a69;
+  --bubble-meta: #7b9585;
+  --av-fg: #ffffff;
+  --pick-bg: #eafaf1;
+  --pick-border: #a0c0ad;
+  --pick-on: #178a5a;
+  --up-bg: #d1eddf;
+  --up-fg: #16704a;
+  --up-track: #bfe3ce;
+  --up-fill: #178a5a;
+  --toast-bg: rgba(43, 57, 49, 0.93);
+  --toast-fg: #eafaf1;
+  --badge-bg: #d1eddf;
+  --badge-fg: #16704a;
+  --badge-gray-bg: #d2edde;
+  --badge-gray-fg: #3d5245;
+  --badge-warn-bg: #e8edda;
+  --badge-warn-fg: #9c6a1a;
+  --role-4-bg: #e8edda;
+  --role-4-fg: #a12a40;
+  --role-3-bg: #e8edda;
+  --role-3-fg: #9c6a1a;
+  --role-2-bg: #d1eddf;
+  --role-2-fg: #16704a;
+  --role-1-bg: #d2edde;
+  --role-1-fg: #458e62;
+  --role-0-bg: #d2edde;
+  --role-0-fg: #3d5245;
+  --mact-off: #a0c0ad;
+  --link: #178a5a;
+  --link-hover: #16754d;
+  --code-bg: #e5f7ed;
+  --code-fg: #132018;
+  --code-border: #bfe3ce;
+  --quote-bg: #e5f7ed;
+  --quote-border: #a0c0ad;
+  --quote-fg: #3d5245;
+  --table-head-bg: #e5f7ed;
+  --table-border: #bfe3ce;
+  --table-stripe: #d2edde;
+  --table-hover: #cdeada;
+  --img-bg: #cdeada;
+  --img-border: #bfe3ce;
+  --shadow: rgba(19, 32, 24, 0.14);
+  --overlay: rgba(19, 32, 24, 0.48);
+  --scrollbar-thumb: #a0c0ad;
+  --scrollbar-thumb-hover: #84a08f;
+  --scrollbar-track: transparent;
+  --card-h-bg: #d2edde;
+  --card-h-fg: #16774e;
+  --dot: #c9e8d6;
+  --stroke: 1px;
+  --drop: 0 2px 8px rgba(19, 32, 24, 0.08);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1c14;
+  --surface: #13291d;
+  --fg: #e6f5ec;
+  --surface-2: #102319;
+  --surface-3: #1f3e2e;
+  --surface-4: #1c3929;
+  --fg-2: #b2cbbc;
+  --fg-3: #88a895;
+  --fg-4: #6d8979;
+  --fg-5: #546d5f;
+  --ph: #6d8979;
+  --border: #28503b;
+  --border-2: #1b3929;
+  --border-3: #4a6e5b;
+  --border-4: #183224;
+  --accent: #5ad6a0;
+  --accent-2: #73dcae;
+  --accent-soft: #1a3a2a;
+  --accent-soft-border: #275942;
+  --accent-ring: rgba(90, 214, 160, 0.35);
+  --on-accent: #151515;
+  --danger: #ff8a8a;
+  --danger-2: #e87070;
+  --warn: #e0b072;
+  --topbar-bg: #5ad6a0;
+  --topbar-fg: #151515;
+  --tabbar-bg: #13291d;
+  --bubble: #13291d;
+  --bubble-mine: #234f3a;
+  --bubble-fg: #e6f5ec;
+  --bubble-who: #88a895;
+  --bubble-meta: #6d8979;
+  --av-fg: #151515;
+  --pick-bg: #13291d;
+  --pick-border: #4a6e5b;
+  --pick-on: #5ad6a0;
+  --up-bg: #1a3a2a;
+  --up-fg: #7ddeb3;
+  --up-track: #28503b;
+  --up-fill: #5ad6a0;
+  --toast-bg: rgba(204, 219, 210, 0.93);
+  --toast-fg: #13291d;
+  --badge-bg: #1a3a2a;
+  --badge-fg: #7ddeb3;
+  --badge-gray-bg: #1f3e2e;
+  --badge-gray-fg: #b2cbbc;
+  --badge-warn-bg: #404730;
+  --badge-warn-fg: #e0b072;
+  --role-4-bg: #404730;
+  --role-4-fg: #ff9a9a;
+  --role-3-bg: #404730;
+  --role-3-fg: #e0b072;
+  --role-2-bg: #1a3a2a;
+  --role-2-fg: #7ddeb3;
+  --role-1-bg: #1f3e2e;
+  --role-1-fg: #69ac84;
+  --role-0-bg: #1f3e2e;
+  --role-0-fg: #b2cbbc;
+  --mact-off: #4a6e5b;
+  --link: #5ad6a0;
+  --link-hover: #76dcaf;
+  --code-bg: #102319;
+  --code-fg: #e6f5ec;
+  --code-border: #28503b;
+  --quote-bg: #102319;
+  --quote-border: #4a6e5b;
+  --quote-fg: #b2cbbc;
+  --table-head-bg: #102319;
+  --table-border: #28503b;
+  --table-stripe: #1f3e2e;
+  --table-hover: #1c3929;
+  --img-bg: #1c3929;
+  --img-border: #28503b;
+  --shadow: rgba(230, 245, 236, 0.28);
+  --overlay: rgba(230, 245, 236, 0.66);
+  --scrollbar-thumb: #4a6e5b;
+  --scrollbar-thumb-hover: #698978;
+  --scrollbar-track: #0d1c14;
+  --card-h-bg: #1f3e2e;
+  --card-h-fg: #73dcae;
+  --dot: #20402f;
+  --stroke: 1px;
+  --drop: 0 2px 8px rgba(230, 245, 236, 0.18);
+}
+
+/* 结构特征：圆角与字体（只对本皮肤生效） */
+html[data-skin="mint"] .card,
+html[data-skin="mint"] .msg-box,
+html[data-skin="mint"] .inp,
+html[data-skin="mint"] input[type=text],
+html[data-skin="mint"] textarea { border-radius: 18px; }
+html[data-skin="mint"] body { font-family: sans; }

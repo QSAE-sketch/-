@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<rect width="320" height="200" fill="#ffffff"/>
+<rect x="10" y="10" width="146" height="180" rx="9" fill="#ffffff" stroke="#e6e6e6" stroke-width="1"/>
+<rect x="10" y="10" width="146" height="26" rx="9" fill="#e0341f"/>
+<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">赤章</text>
+<rect x="22" y="46" width="104" height="18" rx="6" fill="#e6e6e6" opacity=".4"/>
+<rect x="22" y="72" width="112" height="22" rx="6" fill="#ffffff" stroke="#e6e6e6"/>
+<rect x="36" y="110" width="98" height="22" rx="6" fill="#e0341f" opacity=".55"/>
+<rect x="166" y="10" width="144" height="180" rx="9" fill="#1a0f0e" stroke="#4a2824" stroke-width="1"/>
+<rect x="166" y="10" width="144" height="26" rx="9" fill="#ff6b57"/>
+<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">赤章</text>
+<rect x="178" y="46" width="102" height="18" rx="6" fill="#4a2824" opacity=".5"/>
+<rect x="178" y="72" width="118" height="22" rx="6" fill="#261716" stroke="#4a2824"/>
+<rect x="192" y="110" width="106" height="22" rx="6" fill="#ff6b57" opacity=".7"/>
+</svg>

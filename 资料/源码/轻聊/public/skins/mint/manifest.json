@@ -1,0 +1,9 @@
+{
+  "id": "mint",
+  "name": "薄荷 MINT",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "参考 chat 系列 12 风格：薄荷 MINT；浅深两套同色系配色",
+  "entry": "skin.css",
+  "preview": "preview.svg"
+}

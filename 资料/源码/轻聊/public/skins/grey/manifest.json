@@ -1,0 +1,9 @@
+{
+  "id": "grey",
+  "name": "灰调 GREY",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "参考 chat 系列 12 风格：灰调 GREY；浅深两套同色系配色",
+  "entry": "skin.css",
+  "preview": "preview.svg"
+}

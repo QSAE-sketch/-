@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<rect width="320" height="200" fill="#f2ece0"/>
+<rect x="10" y="10" width="146" height="180" rx="9" fill="#faf6ec" stroke="#ded5c3" stroke-width="1"/>
+<rect x="10" y="10" width="146" height="26" rx="9" fill="#a2472b"/>
+<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">墨卷</text>
+<rect x="22" y="46" width="104" height="18" rx="6" fill="#ded5c3" opacity=".4"/>
+<rect x="22" y="72" width="112" height="22" rx="6" fill="#faf6ec" stroke="#ded5c3"/>
+<rect x="36" y="110" width="98" height="22" rx="6" fill="#a2472b" opacity=".55"/>
+<rect x="166" y="10" width="144" height="180" rx="9" fill="#1c1813" stroke="#3d3327" stroke-width="1"/>
+<rect x="166" y="10" width="144" height="26" rx="9" fill="#d9805f"/>
+<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">墨卷</text>
+<rect x="178" y="46" width="102" height="18" rx="6" fill="#3d3327" opacity=".5"/>
+<rect x="178" y="72" width="118" height="22" rx="6" fill="#262019" stroke="#3d3327"/>
+<rect x="192" y="110" width="106" height="22" rx="6" fill="#d9805f" opacity=".7"/>
+</svg>

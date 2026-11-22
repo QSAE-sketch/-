@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<rect width="320" height="200" fill="#e9e6df"/>
+<rect x="10" y="10" width="146" height="180" rx="9" fill="#fbfaf6" stroke="#c9c4b6" stroke-width="1"/>
+<rect x="10" y="10" width="146" height="26" rx="9" fill="#5c5548"/>
+<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">素纸</text>
+<rect x="22" y="46" width="104" height="18" rx="6" fill="#c9c4b6" opacity=".4"/>
+<rect x="22" y="72" width="112" height="22" rx="6" fill="#fbfaf6" stroke="#c9c4b6"/>
+<rect x="36" y="110" width="98" height="22" rx="6" fill="#5c5548" opacity=".55"/>
+<rect x="166" y="10" width="144" height="180" rx="9" fill="#161615" stroke="#393832" stroke-width="1"/>
+<rect x="166" y="10" width="144" height="26" rx="9" fill="#b8b2a6"/>
+<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">素纸</text>
+<rect x="178" y="46" width="102" height="18" rx="6" fill="#393832" opacity=".5"/>
+<rect x="178" y="72" width="118" height="22" rx="6" fill="#20201e" stroke="#393832"/>
+<rect x="192" y="110" width="106" height="22" rx="6" fill="#b8b2a6" opacity=".7"/>
+</svg>

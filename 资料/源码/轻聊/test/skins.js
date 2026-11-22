@@ -82,6 +82,22 @@ function makeZip(files) {
   check('washi 不用黑底大白边', !/#11110f/i.test(washiCss) && !/background:\s*#000/i.test(washiCss));
   check('openwire 保留原始粗黑荧光黄风格', /#11110f/i.test(openwireCss) && /#ffd43b/i.test(openwireCss));
 
+  // 1a. 参考案例做的 12 套内置皮肤：数量、托管、深浅两套配色
+  const NEW_SKIN_IDS = ['inkscroll','sky','plain','vermilion','parchment','mint',
+    'nightgold','oldpaper','pine','deepsea','cloud','grey'];
+  const builtins = (r.json.skins || []).filter((s) => s.builtin);
+  check('内置皮肤共 14 套（原 2 + 新 12）', builtins.length >= 14, builtins.map((s) => s.id));
+  check('12 套新皮肤都在列表里', NEW_SKIN_IDS.every((id) => builtins.some((s) => s.id === id)), builtins.map((s) => s.id));
+  let pairOk = 0;
+  for (const id of NEW_SKIN_IDS) {
+    const css = readSkinCss(id);
+    const lightBg = (css.match(/--bg:\s*(#[0-9a-f]{6})/i) || [])[1];
+    const darkBg = (css.match(/--bg:\s*(#[0-9a-f]{6})[\s\S]*data-theme="dark"[\s\S]*?--bg:\s*(#[0-9a-f]{6})/i) || [])[2];
+    if (lightBg && darkBg && lightBg.toLowerCase() !== darkBg.toLowerCase() &&
+        /html\[data-skin="/.test(css)) pairOk++;
+  }
+  check('12 套新皮肤都有浅深两套不同配色和风格样式', pairOk === 12, pairOk);
+
   // 1b. 直接上传一份 CSS 就能做皮肤（自动生成 manifest 和预览图）
   const cssText = ':root{--bg:#abcdef}\n:root[data-theme="dark"]{--bg:#101010}';
   r = await req('POST', '/api/skins', null, ta, Buffer.from(cssText, 'utf8'),

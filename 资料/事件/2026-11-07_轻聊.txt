@@ -184,3 +184,13 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
   - server.js builtin 数组加 washi 并还原 openwire 描述；test/skins.js 断言改为「washi 双配色无黑边 + openwire 保粗黑荧光黄 + 列表含 washi」
   - 本地/云端各 794/0；线上 /api/version=2.6.1、washi CSS 200、openwire CSS 含 #11110f；已发布
   - 用户后续会给更多参考案例，届时按「配色克制、少重复色」原则继续补内置皮肤
+
+· 2026-11-22 补充（2.7.0/code31）：用户给了三个参考 HTML（Downloads/chat-web.html、chat-12-styles.html、chat-serie02.html，
+  后两个各内置 12 风格），要求自己先创几套内置皮肤、不要只换色
+  - 从 24 套主题提取色相/字体/圆角，精选 12 套风格差异大的：墨卷/晴空/素纸/赤章/羊皮/薄荷/夜金/古纸/松绿/深海/云白/灰调
+  - tools/gen-skins.py 生成器：每套配浅色套 + 同色系重新配色的深色套（非调亮度），一个主色+中性面不堆色；
+    圆角/字体按原风格（晴空19px、素纸2px、墨卷serif 等）
+  - server.js builtin 改为自动扫描 public/skins/*/manifest.json，加皮肤只需放目录；
+    test/skins.js 加断言（14 套、12 个 ID、每套深浅配色不同 + 风格样式）
+  - tools/shot-skins-all.js 用 CDP 逐套读实际计算样式：12/12 浅深不同、标题栏非纯黑、圆角各异
+  - 本地/云端各 797/0；线上 version=2.7.0、12 套 CSS 全 200；已发布

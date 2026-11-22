@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<rect width="320" height="200" fill="#edf3f7"/>
+<rect x="10" y="10" width="146" height="180" rx="9" fill="#fbfdff" stroke="#cadce8" stroke-width="1"/>
+<rect x="10" y="10" width="146" height="26" rx="9" fill="#1a7a99"/>
+<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">深海</text>
+<rect x="22" y="46" width="104" height="18" rx="6" fill="#cadce8" opacity=".4"/>
+<rect x="22" y="72" width="112" height="22" rx="6" fill="#fbfdff" stroke="#cadce8"/>
+<rect x="36" y="110" width="98" height="22" rx="6" fill="#1a7a99" opacity=".55"/>
+<rect x="166" y="10" width="144" height="180" rx="9" fill="#08131f" stroke="#1a3149" stroke-width="1"/>
+<rect x="166" y="10" width="144" height="26" rx="9" fill="#4fb3c9"/>
+<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">深海</text>
+<rect x="178" y="46" width="102" height="18" rx="6" fill="#1a3149" opacity=".5"/>
+<rect x="178" y="72" width="118" height="22" rx="6" fill="#0a1726" stroke="#1a3149"/>
+<rect x="192" y="110" width="106" height="22" rx="6" fill="#4fb3c9" opacity=".7"/>
+</svg>

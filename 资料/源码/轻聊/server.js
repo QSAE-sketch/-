@@ -1794,20 +1794,27 @@ const drive = require('./src/drive')({
 
 /* ---------------- 皮肤系统（标准版） ----------------
  * 皮肤包 = ZIP，元数据进 db('skins')，文件落地 DATA_DIR/skins/。
- * 内置 openwire 皮肤随源码发布，走静态 /skins/ 路径。
+ * 内置皮肤随源码放在 public/skins/<id>/，走静态 /skins/ 路径；
+ * 每个目录自带 manifest.json，这里自动扫描注册，加皮肤只需丢一个目录。
  */
 const SKIN_DIR = path.join(DATA_DIR, 'skins');
+const BUILTIN_SKINS = fs.readdirSync(path.join(PUBLIC_DIR, 'skins'), { withFileTypes: true })
+  .filter((e) => e.isDirectory())
+  .map((e) => {
+    const dir = path.join(PUBLIC_DIR, 'skins', e.name);
+    try {
+      const mf = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+      const files = fs.readdirSync(dir).filter((f) => /\.(css|svg|png|jpe?g|webp|gif)$/i.test(f));
+      if (!/^[a-z0-9-]+$/.test(mf.id || '') || !fs.existsSync(path.join(dir, mf.entry || 'skin.css'))) return null;
+      return { id: mf.id, name: mf.name || mf.id, version: mf.version || '1.0.0',
+        author: mf.author || '系统内置', description: mf.description || '',
+        entry: mf.entry || 'skin.css', files };
+    } catch (e2) { return null; }
+  })
+  .filter(Boolean);
 require('./src/skins').registerSkins({
   route, db, ok, fail, readBinary, DATA_DIR, SKIN_DIR, PUBLIC_DIR,
-  builtin: [{
-    id: 'openwire', name: '天线 OPENWIRE', version: '1.0.0',
-    author: '系统内置', description: '粗黑描边 · 硬阴影 · 米黄网点底 · 荧光黄主色，openwire-chat 原型',
-    entry: 'skin.css', files: ['skin.css', 'manifest.json', 'preview.svg']
-  }, {
-    id: 'washi', name: '暖纸 WASHI', version: '1.0.0',
-    author: '系统内置', description: '米黄网点底 · 柔黄点缀 · 细描边，浅色暖纸/深色暖墨两套真配色',
-    entry: 'skin.css', files: ['skin.css', 'manifest.json', 'preview.svg']
-  }]
+  builtin: BUILTIN_SKINS
 });
 
 /* ---------------- 好友 / 私聊 ---------------- */
