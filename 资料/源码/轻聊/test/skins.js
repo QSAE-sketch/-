@@ -14,9 +14,10 @@ function check(name, cond, extra) {
   if (cond) { pass++; console.log('  ✓ ' + name); }
   else { fail++; console.error('  ✗ ' + name + (extra ? ' :: ' + JSON.stringify(extra) : '')); }
 }
-async function req(method, p, body, token, rawBody, contentType) {
+async function req(method, p, body, token, rawBody, contentType, extraHeaders) {
   const headers = {};
   if (token) headers['X-Token'] = token;
+  if (extraHeaders) Object.assign(headers, extraHeaders);
   let payload;
   if (rawBody) { headers['Content-Type'] = contentType || 'application/octet-stream'; payload = rawBody; }
   else if (body !== undefined && body !== null) { headers['Content-Type'] = 'application/json'; payload = JSON.stringify(body); }
@@ -73,6 +74,21 @@ function makeZip(files) {
   check('列表含内置 openwire', r.status === 200 && (r.json.skins || []).some((s) => s.id === 'openwire' && s.builtin), r.json);
   const builtin = (r.json.skins || []).find((s) => s.id === 'openwire');
   check('内置皮肤有预览图', !!(builtin && builtin.preview), builtin);
+  const builtinCss = fs.readFileSync(path.join(__dirname, '..', 'public', 'skins', 'openwire', 'skin.css'), 'utf8');
+  check('内置皮肤有真正的深色配色', /:root\[data-theme="dark"\]/.test(builtinCss) && /--bg:\s*#1c1c18/i.test(builtinCss));
+  check('内置皮肤不再用黑底大白边', !/#11110f/i.test(builtinCss) && !/background:\s*#000/i.test(builtinCss));
+
+  // 1b. 直接上传一份 CSS 就能做皮肤（自动生成 manifest 和预览图）
+  const cssText = ':root{--bg:#abcdef}\n:root[data-theme="dark"]{--bg:#101010}';
+  r = await req('POST', '/api/skins', null, ta, Buffer.from(cssText, 'utf8'),
+    'application/octet-stream', { 'X-Skin-Name': encodeURIComponent('CSS皮肤' + suffix), 'X-File-Name': 'mine.css' });
+  check('直接上传 CSS 成功', r.status === 200 && r.json.skin && /^css-/.test(r.json.skin.id), r.json);
+  const cssId = r.json.skin && r.json.skin.id;
+  check('CSS 皮肤自动生成预览图', !!(r.json.skin && r.json.skin.preview), r.json.skin);
+  r = await req('GET', '/api/skins/' + cssId + '/file/skin.css', null, ta);
+  check('CSS 文件内容正确', r.status === 200 && /abcdef/.test(r.text), r.status);
+  r = await req('GET', '/api/skins/' + cssId + '/file/preview.svg', null, ta);
+  check('自动预览图可访问', r.status === 200 && /<svg/.test(r.text), r.status);
 
   // 2. 上传合法 ZIP
   const id = 'testskin' + suffix;
@@ -117,11 +133,15 @@ function makeZip(files) {
 
   // 6. 内置皮肤文件可通过静态路径读到
   r = await req('GET', '/skins/openwire/skin.css', null, null);
-  check('内置皮肤 CSS 可访问', r.status === 200 && /openwire/.test(r.text), r.status);
+  check('内置皮肤 CSS 可访问', r.status === 200 && /OPENWIRE/i.test(r.text), r.status);
   r = await req('GET', '/skins/example-skin.zip', null, null);
   check('示例包可下载', r.status === 200 && r.text.length > 100, r.status);
+  r = await req('GET', '/skins/example-skin.css', null, null);
+  check('最简 CSS 示例可下载', r.status === 200 && /data-theme="dark"/.test(r.text), r.status);
 
   // 7. 删除
+  r = await req('DELETE', '/api/skins/' + cssId, null, ta);
+  check('删除 CSS 皮肤', r.status === 200, r.status);
   r = await req('DELETE', '/api/skins/' + id, null, ta);
   check('删除自己的皮肤', r.status === 200, r.status);
   r = await req('GET', '/api/skins', null, ta);

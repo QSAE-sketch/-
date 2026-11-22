@@ -162,3 +162,18 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
 · 验证：npm test(local) 784/0、npm run test:cloud 784/0（云端专项含「列表含内置 openwire」通过，测试自建 292 条已清理）；
   线上 /api/version=2.5.1、app.js 含 openAppearance
 · 发布 2.5.1/code28，链接不变
+
+— 2026-11-22　v2.6.0 皮肤重做配色 + 深浅色两套 + 上传只要 CSS
+· 用户反馈（附截图）：内置皮肤黑底白字大标题条 + 粗黑边很难受；深浅色看着一样、像只调亮度；
+  自制皮肤规范要求做太多东西，希望只保留最关键部分；给了参考项目 Trae-CN/temp_20261121_01/openwire
+· 根因：skin.css 用 :root 写死浅色且 color-scheme:light，与基础 [data-theme="dark"] 同优先级且后加载 → 深色被浅色覆盖。
+  → 改为 :root（浅色）+ :root[data-theme="dark"]（深色）两套完整变量；深色是暖墨底 #1c1c18，不是调亮度
+· 内置 openwire v2.0.0：去 #11110f 黑边/黑标题条，改暖纸 #fff7e9 + 柔黄 #ffd43b + 细描边 1.5px + 柔和阴影；
+  card-h 用 --card-h-bg/--card-h-fg；preview.svg 改左右对照展示浅/深两套；serve 内置元数据版本变化会刷新旧记录
+· 上传简化：POST /api/skins 按 PK 头识别；非 ZIP 即当 CSS，自动生成 id/manifest/preview.svg（autoPreview 从 --accent 取色）；
+  中文文件名经 encodeURIComponent 放 X-Skin-Name/X-File-Name，后端 decodeHeader 还原（HTTP 头不能带非 ASCII）
+· 前端：skinUpload 接受 .css，showSkinHelp 重写为「只要一份 CSS」+ 深浅写法示例；新增 public/skins/example-skin.css；
+  example-skin.zip 重建为深浅双色版；app.js 写死的 11 处 #57606a / 4 处 #8b949e / 1 处 #bc4c00 改主题变量
+· 验证：本地/云端各 792/0；新增 CDP 脚本 tools/shot-skin-compare.js 实测浅色 body=rgb(255,247,233)、
+  深色 body=rgb(28,28,24)、card-h 黄→深灰，两套确实不同；线上 /api/version=2.6.0、CSS 无 #11110f、示例 CSS 200
+· 发布 2.6.0/code29，链接不变

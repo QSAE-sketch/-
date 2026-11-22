@@ -1,151 +1,240 @@
-/* 天线 OPENWIRE 皮肤 —— 粗黑描边 + 硬阴影 + 米黄底 + 荧光黄主色
- * 只覆盖变量即可换肤；结构微调统一放在 html[data-skin="openwire"] 作用域。
+/* 天线 OPENWIRE · 纸张版皮肤
+ *
+ * 配色分两套：:root 是浅色，:root[data-theme="dark"] 是深色。
+ * 两套是完全不同的颜色，不是简单调亮度：浅色是暖纸 + 黄，深色是暖墨 + 黄。
+ * 结构样式只做轻微描边和柔和阴影，不再用大块黑底白字。
  */
-
-:root, html[data-skin="openwire"] {
+:root {
   color-scheme: light;
 
-  --bg: #fff4df;
-  --surface: #fffdf7;
-  --surface-2: #fff8e8;
-  --surface-3: #fff1d4;
-  --surface-4: #f3e7cc;
+  /* ---- 基础面：暖白纸张 ---- */
+  --bg: #fff7e9;
+  --surface: #fffdf8;
+  --surface-2: #fff9ef;
+  --surface-3: #fdf3df;
+  --surface-4: #f7ecd7;
 
-  --fg: #11110f;
-  --fg-2: #4d4b44;
-  --fg-3: #6f6b5f;
-  --fg-4: #8d887a;
-  --fg-5: #a39c8a;
-  --ph: #9a9280;
+  /* ---- 文字 ---- */
+  --fg: #2b2a24;
+  --fg-2: #5b574b;
+  --fg-3: #807a6b;
+  --fg-4: #9a9384;
+  --fg-5: #aca596;
+  --ph: #9a9384;
 
-  --border: #11110f;
-  --border-2: #d8cdb2;
-  --border-3: #11110f;
-  --border-4: #e6d9bb;
+  /* ---- 描边：暖灰棕，不是纯黑 ---- */
+  --border: #ded2b8;
+  --border-2: #efe6d2;
+  --border-3: #cdbf9f;
+  --border-4: #f2ead9;
 
-  --accent: #11110f;
-  --accent-2: #000000;
-  --accent-soft: #fff2a8;
-  --accent-soft-border: #11110f;
-  --accent-ring: rgba(255, 212, 59, .7);
-  --on-accent: #11110f;
-  --danger: #d63457;
-  --danger-2: #a51e3c;
-  --warn: #b46900;
+  /* ---- 主色 / 语义 ---- */
+  --accent: #a87600;
+  --accent-2: #8b6100;
+  --accent-soft: #fff0b8;
+  --accent-soft-border: #e8cf82;
+  --accent-ring: rgba(255, 212, 59, .5);
+  --on-accent: #2b2a24;
+  --danger: #c33a52;
+  --danger-2: #a12a40;
+  --warn: #a86a00;
 
+  /* ---- 组件 ---- */
   --topbar-bg: #ffd43b;
-  --topbar-fg: #11110f;
-  --tabbar-bg: #fffdf7;
-  --bubble: #fffdf7;
-  --bubble-mine: #ffd43b;
-  --bubble-fg: #11110f;
-  --bubble-who: #6f6b5f;
-  --bubble-meta: #8d887a;
-  --av-fg: #11110f;
-  --pick-bg: #fffdf7;
-  --pick-border: #11110f;
-  --pick-on: #11110f;
-  --up-bg: #fff2a8;
-  --up-fg: #6b5b00;
-  --up-track: #e6d9bb;
+  --topbar-fg: #2b2a24;
+  --tabbar-bg: #fffdf8;
+  --bubble: #fffdf8;
+  --bubble-mine: #fff0b8;
+  --bubble-fg: #2b2a24;
+  --bubble-who: #807a6b;
+  --bubble-meta: #9a9384;
+  --av-fg: #2b2a24;
+  --pick-bg: #fffdf8;
+  --pick-border: #cdbf9f;
+  --pick-on: #a87600;
+  --up-bg: #fff3c4;
+  --up-fg: #7a5a00;
+  --up-track: #efe2c4;
+  --up-fill: #e8b92e;
+  --toast-bg: rgba(43, 42, 36, .92);
+  --toast-fg: #fff8e9;
+  --badge-bg: #fff0b8;
+  --badge-fg: #7a5a00;
+  --badge-gray-bg: #f1e9d8;
+  --badge-gray-fg: #6f6a5b;
+  --badge-warn-bg: #ffe0ec;
+  --badge-warn-fg: #a12a52;
+  --role-4-bg: #ffe0ec; --role-4-fg: #a12a52;
+  --role-3-bg: #fff0b8; --role-3-fg: #7a5a00;
+  --role-2-bg: #e2f0ff; --role-2-fg: #2a5f8f;
+  --role-1-bg: #e8f5d8; --role-1-fg: #4a7a2a;
+  --role-0-bg: #f1e9d8; --role-0-fg: #6f6a5b;
+  --mact-off: #c4baa4;
+
+  /* ---- 内容区 ---- */
+  --link: #a34500;
+  --link-hover: #7d3400;
+  --code-bg: #fff9ef;
+  --code-fg: #2b2a24;
+  --code-border: #ded2b8;
+  --quote-bg: #fff9ef;
+  --quote-border: #cdbf9f;
+  --quote-fg: #5b574b;
+  --table-head-bg: #fff9ef;
+  --table-border: #ded2b8;
+  --table-stripe: #fffdf8;
+  --table-hover: #fdf3df;
+  --img-bg: #f7ecd7;
+  --img-border: #ded2b8;
+
+  /* ---- 其它 ---- */
+  --shadow: rgba(96, 76, 34, .14);
+  --overlay: rgba(30, 26, 18, .5);
+  --scrollbar-thumb: #d3c7ac;
+  --scrollbar-thumb-hover: #b9ab8d;
+  --scrollbar-track: transparent;
+
+  /* ---- 本皮肤专用 ---- */
+  --card-h-bg: #fff2bf;
+  --card-h-fg: #5a4400;
+  --dot: #ead9b5;
+  --stroke: 1.5px;
+  --drop: 0 2px 8px rgba(96, 76, 34, .10);
+}
+
+/* ---- 深色：暖墨底 + 黄，和浅色是两套颜色 ---- */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #1c1c18;
+  --surface: #26261f;
+  --surface-2: #2c2c24;
+  --surface-3: #34342b;
+  --surface-4: #22221c;
+
+  --fg: #f2ecd9;
+  --fg-2: #c9c1a9;
+  --fg-3: #9d9580;
+  --fg-4: #857d69;
+  --fg-5: #736b58;
+  --ph: #857d69;
+
+  --border: #46463a;
+  --border-2: #333329;
+  --border-3: #5b5b4c;
+  --border-4: #2d2d25;
+
+  --accent: #ffd43b;
+  --accent-2: #e6bb2c;
+  --accent-soft: #433a1c;
+  --accent-soft-border: #6b5c2b;
+  --accent-ring: rgba(255, 212, 59, .4);
+  --on-accent: #1c1c18;
+  --danger: #ff9a9a;
+  --danger-2: #e87575;
+  --warn: #e8bd72;
+
+  --topbar-bg: #2c2c24;
+  --topbar-fg: #ffd43b;
+  --tabbar-bg: #26261f;
+  --bubble: #2c2c24;
+  --bubble-mine: #4a4020;
+  --bubble-fg: #f2ecd9;
+  --bubble-who: #9d9580;
+  --bubble-meta: #857d69;
+  --av-fg: #f2ecd9;
+  --pick-bg: #26261f;
+  --pick-border: #5b5b4c;
+  --pick-on: #ffd43b;
+  --up-bg: #33301f;
+  --up-fg: #e0cf94;
+  --up-track: #3f3d31;
   --up-fill: #ffd43b;
-  --toast-bg: #11110f;
-  --toast-fg: #fff4df;
-  --badge-bg: #c9f0a0;
-  --badge-fg: #11110f;
-  --badge-gray-bg: #e6d9bb;
-  --badge-gray-fg: #4d4b44;
-  --badge-warn-bg: #ff6ca8;
-  --badge-warn-fg: #11110f;
-  --role-4-bg: #ff6ca8; --role-4-fg: #11110f;
-  --role-3-bg: #ffd43b; --role-3-fg: #11110f;
-  --role-2-bg: #a9d6ff; --role-2-fg: #11110f;
-  --role-1-bg: #c9f0a0; --role-1-fg: #11110f;
-  --role-0-bg: #e6d9bb; --role-0-fg: #4d4b44;
-  --mact-off: #b9ad91;
+  --toast-bg: rgba(12, 12, 10, .94);
+  --toast-fg: #f2ecd9;
+  --badge-bg: #433a1c;
+  --badge-fg: #ffd43b;
+  --badge-gray-bg: #333329;
+  --badge-gray-fg: #bfb7a1;
+  --badge-warn-bg: #4a2a34;
+  --badge-warn-fg: #ffb6cd;
+  --role-4-bg: #4a2a34; --role-4-fg: #ffb6cd;
+  --role-3-bg: #433a1c; --role-3-fg: #ffd43b;
+  --role-2-bg: #263847; --role-2-fg: #a9d6ff;
+  --role-1-bg: #2d3d28; --role-1-fg: #c9f0a0;
+  --role-0-bg: #333329; --role-0-fg: #bfb7a1;
+  --mact-off: #6a6a58;
 
-  --link: #b33000;
-  --link-hover: #8a2400;
-  --code-bg: #fff8e8;
-  --code-fg: #11110f;
-  --code-border: #11110f;
+  --link: #ffd873;
+  --link-hover: #ffe49f;
+  --code-bg: #2c2c24;
+  --code-fg: #e8dfc8;
+  --code-border: #46463a;
+  --quote-bg: #2c2c24;
+  --quote-border: #5b5b4c;
+  --quote-fg: #c9c1a9;
+  --table-head-bg: #2c2c24;
+  --table-border: #46463a;
+  --table-stripe: #26261f;
+  --table-hover: #34342b;
+  --img-bg: #22221c;
+  --img-border: #46463a;
 
-  --shadow: 4px 4px 0 #11110f;
+  --shadow: rgba(0, 0, 0, .45);
+  --overlay: rgba(0, 0, 0, .7);
+  --scrollbar-thumb: #4e4e40;
+  --scrollbar-thumb-hover: #666656;
+  --scrollbar-track: #1c1c18;
+
+  --card-h-bg: #34342b;
+  --card-h-fg: #ffd43b;
+  --dot: #34342b;
+  --stroke: 1.5px;
+  --drop: 0 2px 10px rgba(0, 0, 0, .35);
 }
 
-/* ---- 结构：粗边框 + 硬阴影 ---- */
-html[data-skin="openwire"], html[data-skin="openwire"] body {
+/* ---- 结构：细描边 + 柔和阴影，标题栏不再黑底白字 ---- */
+body {
   background-color: var(--bg);
-  background-image: radial-gradient(#e6d7ba 1.1px, transparent 1.1px);
-  background-size: 22px 22px;
-  font-family: "Archivo Black", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-html[data-skin="openwire"] .topbar {
-  border-bottom: 3px solid #11110f;
-}
-html[data-skin="openwire"] .tb-title {
-  font-weight: 900;
-  letter-spacing: -.01em;
-}
-html[data-skin="openwire"] .card {
-  border: 2.5px solid #11110f;
-  border-radius: 2px;
-  box-shadow: 4px 4px 0 #11110f;
+.topbar { border-bottom: var(--stroke) solid var(--border-3); }
+.tb-title { font-weight: 800; letter-spacing: -.01em; }
+
+.card {
+  border: var(--stroke) solid var(--border-3);
+  border-radius: 10px;
+  box-shadow: var(--drop);
   margin: 12px 10px 16px;
 }
-html[data-skin="openwire"] .card-h {
-  background: #11110f;
-  color: #fff4df;
-  border-bottom: 2.5px solid #11110f;
+.card-h {
+  background: var(--card-h-bg);
+  color: var(--card-h-fg);
+  border-bottom: var(--stroke) solid var(--border-3);
   font-weight: 700;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
 }
-html[data-skin="openwire"] .row:active,
-html[data-skin="openwire"] .act:active {
-  background: #fff2a8;
+.row:active, .act:active { background: var(--accent-soft); }
+.act { font-weight: 600; border-bottom: 1px solid var(--border-2); }
+
+.btn, .inp, .msg-box,
+input[type=text], input[type=password], textarea {
+  border: var(--stroke) solid var(--border-3);
+  border-radius: 8px;
 }
-html[data-skin="openwire"] .act {
-  font-weight: 700;
-  color: #11110f;
-  border-bottom: 2px solid #11110f;
-}
-html[data-skin="openwire"] .btn,
-html[data-skin="openwire"] .inp,
-html[data-skin="openwire"] .msg-box,
-html[data-skin="openwire"] input[type=text],
-html[data-skin="openwire"] input[type=password],
-html[data-skin="openwire"] textarea {
-  border: 2px solid #11110f;
-  border-radius: 2px;
-  box-shadow: 3px 3px 0 #11110f;
-}
-html[data-skin="openwire"] .btn.primary {
-  background: #ffd43b;
-  color: #11110f;
+.btn.primary {
+  background: var(--topbar-bg);
+  color: var(--topbar-fg);
   font-weight: 800;
 }
-html[data-skin="openwire"] .btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 1px 1px 0 #11110f;
-}
-html[data-skin="openwire"] .tabbar {
-  border-top: 3px solid #11110f;
-}
-html[data-skin="openwire"] .tb-btn {
-  font-weight: 800;
-  border-right: 2px solid #11110f;
-}
-html[data-skin="openwire"] .tb-btn:last-child { border-right: 0; }
-html[data-skin="openwire"] .tb-btn.active {
-  background: #ffd43b;
-  color: #11110f;
-}
-html[data-skin="openwire"] .badge {
-  border: 1.5px solid #11110f;
-  font-weight: 700;
-}
-html[data-skin="openwire"] .row-av {
-  border: 2px solid #11110f;
-  box-shadow: 2px 2px 0 #11110f;
-}
+.btn:active { transform: translate(1px, 1px); }
+
+.tabbar { border-top: var(--stroke) solid var(--border-3); }
+.tb-btn { font-weight: 700; border-right: 1px solid var(--border-2); }
+.tb-btn:last-child { border-right: 0; }
+.tb-btn.active { background: var(--accent-soft); color: var(--accent); }
+
+.badge { border: 1px solid var(--border-3); font-weight: 600; }
+.row-av { border: var(--stroke) solid var(--border-3); }

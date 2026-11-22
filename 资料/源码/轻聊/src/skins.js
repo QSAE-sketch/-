@@ -77,6 +77,40 @@ function parseManifest(entries) {
   };
 }
 
+/** HTTP 头只能是 Latin-1；前端把中文文件名 encodeURIComponent 后传过来 */
+function decodeHeader(v) {
+  const s = cleanStr(v, 160);
+  try { return decodeURIComponent(s); } catch (e) { return s; }
+}
+
+function xmlEscape(s) {
+  return String(s || '').replace(/[<>&"']/g, (c) => ({
+    '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&apos;'
+  }[c]));
+}
+
+/** 直接上传 CSS 时自动生成一张预览图，用户就不用再单独做预览文件 */
+function autoPreview(name, css) {
+  const m = String(css).match(/--accent\s*:\s*(#[0-9a-fA-F]{3,8})/);
+  const accent = m ? m[1] : '#ffd43b';
+  const title = xmlEscape(cleanStr(name, 18) || '我的皮肤');
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">' +
+    '<rect width="320" height="200" fill="#fff7e9"/>' +
+    '<rect x="16" y="14" width="288" height="30" rx="6" fill="' + accent + '"/>' +
+    '<text x="30" y="34" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#2b2a24">' + title + '</text>' +
+    '<rect x="16" y="56" width="288" height="110" rx="8" fill="#fffdf8" stroke="#cdbf9f" stroke-width="1.5"/>' +
+    '<rect x="16" y="56" width="288" height="26" rx="8" fill="#fff2bf"/>' +
+    '<text x="30" y="74" font-family="Arial,sans-serif" font-size="11" fill="#5a4400">界面预览</text>' +
+    '<rect x="30" y="94" width="120" height="20" rx="6" fill="#fffdf8" stroke="#ded2b8"/>' +
+    '<rect x="170" y="122" width="120" height="20" rx="6" fill="' + accent + '"/>' +
+    '<text x="100" y="150" font-family="Arial,sans-serif" font-size="10" fill="#a87600">这份 CSS 已自动套用到轻聊</text>' +
+    '<rect x="16" y="176" width="288" height="16" rx="6" fill="#fffdf8" stroke="#cdbf9f"/>' +
+    '<rect x="16" y="176" width="72" height="16" rx="6" fill="#fff0b8"/>' +
+    '</svg>';
+  return Buffer.from(svg, 'utf8');
+}
+
 function publicSkin(s, user) {
   return {
     id: s.id, name: s.name, version: s.version, author: s.author,
@@ -120,17 +154,19 @@ function registerSkins(deps) {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { /* 忽略 */ }
   }
 
-  // 把内置皮肤写进 db（幂等），这样列表逻辑只需查一处
+  // 把内置皮肤写进 db（幂等），这样列表逻辑只需查一处。
+  // 版本/说明变化时也刷新旧记录，否则线上会一直显示上一版内置皮肤的元数据。
   function ensureBuiltin() {
     for (const b of builtin) {
-      if (!db.get('skins', b.id)) {
-        db.put('skins', {
-          id: b.id, name: b.name, version: b.version, author: '系统内置',
-          description: b.description, entry: b.entry, preview: 'preview.svg',
-          isPublic: true, builtin: true, ownerId: '', createdAt: Date.now(),
-          files: b.files
-        });
-      }
+      const old = db.get('skins', b.id);
+      if (old && old.version === b.version && old.description === b.description &&
+          old.preview === 'preview.svg' && old.entry === b.entry) continue;
+      db.put('skins', {
+        id: b.id, name: b.name, version: b.version, author: '系统内置',
+        description: b.description, entry: b.entry, preview: 'preview.svg',
+        isPublic: true, builtin: true, ownerId: '', createdAt: old ? old.createdAt : Date.now(),
+        files: b.files
+      });
     }
   }
   // 注意：不能在注册时调用。server.js 里注册发生在 initStore() 之前，此时
@@ -150,12 +186,55 @@ function registerSkins(deps) {
     ok(res, { skins: mine.map((s) => publicSkin(s, ctx.user)) });
   });
 
-  /** 上传皮肤 ZIP（二进制 body，Content-Type: application/zip） */
+  /**
+   * 上传皮肤：一份 .css 就够了（最简方式），也支持完整 .zip 包。
+   * 判断依据是二进制头 PK，不信任 Content-Type。
+   * CSS 方式会自动补 manifest 和预览图，用户只需写配色。
+   */
   route('POST', '/api/skins', async (req, res, ctx) => {
     ensureReady();
     let buf;
     try { buf = await readBinary(req, MAX_ZIP); }
     catch (e) { return fail(res, 413, '皮肤包超过 3MB 上限'); }
+
+    const isZip = buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b;
+    if (!isZip) {
+      // ---- 直接上传 CSS：自动生成 manifest + 预览图 ----
+      const css = buf.toString('utf8');
+      if (css.indexOf('\0') >= 0) return fail(res, 400, '这不是文本文件，请上传 .css 或 .zip');
+      const headerFile = decodeHeader(req.headers['x-file-name']);
+      const headerName = decodeHeader(req.headers['x-skin-name']);
+      if (!/\.css$/i.test(headerFile) && !/\.css$/i.test(headerName) &&
+          !/\b--[\w-]+\s*:/.test(css)) {
+        return fail(res, 400, '无法识别皮肤文件：请上传 .css 或 .zip');
+      }
+      let id = 'css-' + crypto.randomBytes(3).toString('hex');
+      while (db.get('skins', id) || builtin.some((b) => b.id === id)) {
+        id = 'css-' + crypto.randomBytes(3).toString('hex');
+      }
+      const rawName = cleanStr(headerName, 40) ||
+        cleanStr(headerFile, 40).replace(/\.css$/i, '') || '我的皮肤';
+      const preview = autoPreview(rawName, css);
+      const manifest = {
+        id, name: rawName, version: '1.0.0', author: cleanStr(ctx.user && ctx.user.nickname, 40),
+        description: '直接上传的 CSS 皮肤', entry: 'skin.css', preview: 'preview.svg'
+      };
+      const entries = [
+        { name: 'manifest.json', data: Buffer.from(JSON.stringify(manifest), 'utf8') },
+        { name: 'skin.css', data: buf },
+        { name: 'preview.svg', data: preview }
+      ];
+      writeFiles(id, entries);
+      const doc = {
+        id, name: manifest.name, version: manifest.version, author: manifest.author,
+        description: manifest.description, entry: 'skin.css', preview: 'preview.svg',
+        isPublic: false, builtin: false, ownerId: ctx.user.id, createdAt: Date.now()
+      };
+      db.put('skins', doc);
+      return ok(res, { skin: publicSkin(doc, ctx.user) });
+    }
+
+    // ---- 完整 ZIP 包 ----
     let entries;
     try { entries = parseZip(buf); }
     catch (e) { return fail(res, 400, e.message || 'ZIP 解析失败'); }

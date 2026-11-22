@@ -1,0 +1,96 @@
+/* 最简单的轻聊皮肤示例
+ * 用法：复制这个文件，改改颜色，直接上传到「主页 → 皮肤中心」。
+ * 浅色写在 :root，深色写在 :root[data-theme="dark"]，两套都要写，
+ * 切换「外观 · 主题」时才会真的变深浅（不是只调亮度）。
+ */
+
+/* 浅色：暖纸 + 粉 */
+:root {
+  --bg: #fff5f7;
+  --surface: #ffffff;
+  --surface-2: #fff9fb;
+  --surface-3: #ffeef3;
+  --surface-4: #ffe0e9;
+
+  --fg: #3a1f2b;
+  --fg-2: #6b4152;
+  --fg-3: #9a7284;
+  --border: #f0c9d8;
+  --border-3: #e6b3c8;
+
+  --accent: #c62f63;
+  --accent-soft: #ffe6ee;
+  --on-accent: #ffffff;
+  --danger: #c12435;
+
+  --topbar-bg: #e0487a;
+  --topbar-fg: #ffffff;
+  --tabbar-bg: #ffffff;
+  --bubble: #ffffff;
+  --bubble-mine: #ffd8e6;
+  --bubble-fg: #3a1f2b;
+  --pick-on: #e0487a;
+  --badge-bg: #ffe0ec;
+  --badge-fg: #c62f63;
+  --link: #c62f63;
+
+  /* 让卡片标题栏换成柔和的粉色，而不是黑条 */
+  --card-h-bg: #ffe0ec;
+  --card-h-fg: #8a3055;
+  --dot: #f3d5de;
+  --stroke: 1.5px;
+  --drop: 0 2px 8px rgba(160, 70, 110, .12);
+}
+
+/* 深色：真的换一整套颜色，暖墨 + 粉，不是把浅色调暗 */
+:root[data-theme="dark"] {
+  --bg: #1e1820;
+  --surface: #2a212b;
+  --surface-2: #322731;
+  --surface-3: #3c2e39;
+  --surface-4: #251e26;
+
+  --fg: #f7e9f0;
+  --fg-2: #d2b6c5;
+  --fg-3: #a88a9b;
+  --border: #4b3845;
+  --border-3: #62495a;
+
+  --accent: #ff8fb4;
+  --accent-soft: #4a2c3b;
+  --on-accent: #1e1820;
+  --danger: #ff9a9a;
+
+  --topbar-bg: #322731;
+  --topbar-fg: #ff8fb4;
+  --tabbar-bg: #2a212b;
+  --bubble: #322731;
+  --bubble-mine: #5a3047;
+  --bubble-fg: #f7e9f0;
+  --pick-on: #ff8fb4;
+  --badge-bg: #4a2c3b;
+  --badge-fg: #ff8fb4;
+  --link: #ffb3ce;
+
+  --card-h-bg: #3c2e39;
+  --card-h-fg: #ff8fb4;
+  --dot: #382b35;
+  --stroke: 1.5px;
+  --drop: 0 2px 10px rgba(0, 0, 0, .4);
+}
+
+/* 结构微调：可选，写普通选择器即可，只在这套皮肤生效时加载 */
+body {
+  background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.card {
+  border: var(--stroke) solid var(--border-3);
+  border-radius: 10px;
+  box-shadow: var(--drop);
+}
+.card-h {
+  background: var(--card-h-bg);
+  color: var(--card-h-fg);
+  border-bottom: var(--stroke) solid var(--border-3);
+}

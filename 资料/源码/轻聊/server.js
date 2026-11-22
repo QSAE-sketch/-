@@ -1800,8 +1800,8 @@ const SKIN_DIR = path.join(DATA_DIR, 'skins');
 require('./src/skins').registerSkins({
   route, db, ok, fail, readBinary, DATA_DIR, SKIN_DIR, PUBLIC_DIR,
   builtin: [{
-    id: 'openwire', name: '天线 OPENWIRE', version: '1.0.0',
-    author: '系统内置', description: '粗黑描边 · 硬阴影 · 米黄网点底 · 荧光黄主色',
+    id: 'openwire', name: '天线 OPENWIRE', version: '2.0.0',
+    author: '系统内置', description: '暖纸 + 柔黄；浅色暖纸、深色暖墨，两套真配色',
     entry: 'skin.css', files: ['skin.css', 'manifest.json', 'preview.svg']
   }]
 });

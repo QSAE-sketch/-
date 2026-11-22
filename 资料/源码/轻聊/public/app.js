@@ -385,11 +385,11 @@
   /** 皮肤面板：预览图 + 应用 + 上传 + 公开/删除 */
   function openSkins() {
     var h = '<div class="skin-intro">给界面换一套外观。点「预览」看效果，点「使用」立即切换；' +
-      '自己的皮肤可设为公开给大家用，也可上传 ZIP 包制作新皮肤。</div>' +
+      '做自己的皮肤只要一份 CSS 文件，上传即可（也支持 ZIP 完整包）。</div>' +
       '<div class="skin-list" id="skinList">加载中…</div>' +
       '<div class="skin-tools">' +
-      '<label class="mini-btn" for="skinUpload">📦 上传皮肤 ZIP</label>' +
-      '<input type="file" id="skinUpload" accept=".zip,application/zip" style="display:none">' +
+      '<label class="mini-btn" for="skinUpload">📦 上传皮肤（CSS / ZIP）</label>' +
+      '<input type="file" id="skinUpload" accept=".css,.zip,text/css,application/zip" style="display:none">' +
       '<div class="mini-btn" id="skinHelp">📖 制作规范</div></div>' +
       '<div class="r-sub" id="skinUploadTip" style="padding:8px 2px 0"></div>';
     openModal('皮肤中心', h, null, '关闭');
@@ -506,12 +506,13 @@
     }, '使用这个皮肤');
   }
 
-  /** 上传 ZIP 皮肤 */
+  /** 上传皮肤：一份 CSS 就行，也可上传 ZIP 完整包 */
   function skinUpload(file) {
-    if (!/\.zip$/i.test(file.name)) { toast('请选择 .zip 皮肤包'); return; }
-    if (file.size > 3 * 1024 * 1024) { toast('皮肤包不能超过 3MB'); return; }
+    if (!/\.(css|zip)$/i.test(file.name)) { toast('请选择 .css 或 .zip 皮肤文件'); return; }
+    if (file.size > 3 * 1024 * 1024) { toast('皮肤文件不能超过 3MB'); return; }
     var tip = $('skinUploadTip');
     if (tip) tip.textContent = '上传中…';
+    var name = String(file.name || '').replace(/\.(css|zip)$/i, '');
     apiFile('POST', '/api/skins', file, function (loaded, total) {
       if (tip && total) tip.textContent = '上传中 ' + Math.round(loaded * 100 / total) + '%';
     }, function (err, data) {
@@ -522,38 +523,36 @@
       }
       if (tip) tip.textContent = '上传成功：' + (data.skin ? data.skin.name : '');
       skinLoad(function () { renderSkinList(); });
-    });
+    }, { 'X-Skin-Name': encodeURIComponent(name), 'X-File-Name': encodeURIComponent(String(file.name || '')) });
   }
 
-  /** 制作规范（ZIP 里该放什么、怎么改） */
+  /** 制作规范：最简只要一份 CSS，深浅色各写一套 */
   function showSkinHelp() {
     var h = '<div class="skin-help">' +
-      '<p><b>皮肤包就是一个 ZIP</b>，解压后根目录必须有 <code>manifest.json</code>，' +
-      '再放一份 CSS（默认 <code>skin.css</code>），可选预览图与字体/图片。</p>' +
-      '<pre>' +
-      'my-skin/\n' +
-      '├─ manifest.json   ← 必填，皮肤信息\n' +
-      '├─ skin.css        ← 必填，样式\n' +
-      '├─ preview.png     ← 可选，预览图\n' +
-      '└─ images/…        ← 可选，CSS 里引用\n' +
-      '</pre>' +
-      '<p><b>manifest.json 示例：</b></p>' +
-      '<pre>{\n' +
-      '  "id": "my-skin",\n' +
-      '  "name": "我的皮肤",\n' +
-      '  "version": "1.0.0",\n' +
-      '  "author": "你的名字",\n' +
-      '  "description": "一句话介绍",\n' +
-      '  "entry": "skin.css",\n' +
-      '  "preview": "preview.png"\n' +
+      '<p><b>最简单的做法：只写一份 CSS 文件，上传就行。</b>' +
+      '名字、编号、预览图都会自动生成，不用再准备 manifest 或图片。</p>' +
+      '<p><b>CSS 这样写（浅色 + 深色各一套，是真的两套颜色）：</b></p>' +
+      '<pre>/* 浅色 */\n' +
+      ':root{\n' +
+      '  --bg:#fff7e9; --surface:#fffdf8;\n' +
+      '  --fg:#2b2a24; --border:#ded2b8;\n' +
+      '  --accent:#a87600; --topbar-bg:#ffd43b;\n' +
+      '}\n' +
+      '/* 深色：换一整套色，不是调亮度 */\n' +
+      ':root[data-theme="dark"]{\n' +
+      '  --bg:#1c1c18; --surface:#26261f;\n' +
+      '  --fg:#f2ecd9; --border:#46463a;\n' +
+      '  --accent:#ffd43b; --topbar-bg:#2c2c24;\n' +
       '}</pre>' +
-      '<p><b>换配色</b>：在 CSS 里覆盖变量即可，例如 <code>:root{--accent:#ffd43b;' +
-      '--bg:#fff4df;--surface:#fffdf7}</code>。</p>' +
-      '<p><b>改结构</b>：用 <code>html[data-skin="my-skin"] .card{…}</code> 这种选择器写任意样式，' +
-      '只对你这套皮肤生效。</p>' +
-      '<p class="dim">id 只能用小写字母/数字/横线；ZIP ≤ 3MB，解压后 ≤ 10MB；' +
-      '只允许 css/png/jpg/gif/webp/svg/字体/json/txt 文件。上传后默认私密，可在列表里设公开。</p>' +
-      '<p><a class="btn small" href="/skins/example-skin.zip" download="示例皮肤包.zip">⬇ 下载示例皮肤包</a></p>' +
+      '<p>浅色用 <code>:root</code>，深色用 <code>:root[data-theme="dark"]</code>，' +
+      '这样切换「外观 · 主题」时皮肤会真的跟着变深浅。只写浅色的话，深色模式会一直显示浅色。</p>' +
+      '<p><b>想改细节</b>：直接写普通选择器，例如 <code>.card-h{background:#fff2bf}</code>；' +
+      'CSS 只在你选用这套皮肤时生效，不用担心影响别人。</p>' +
+      '<p><b>要打包图片/字体</b> 才需要 ZIP：根目录放 <code>skin.css</code>，' +
+      '可选 <code>manifest.json</code>（不写会自动生成）、预览图和 images/ 目录。ZIP ≤ 3MB。</p>' +
+      '<p class="dim">上传后默认只有自己能用，可以在皮肤列表里点「设公开」分享给大家，也能随时删除。</p>' +
+      '<p><a class="btn small" href="/skins/example-skin.css" download="示例皮肤.css">⬇ 下载最简单的 CSS 示例</a>' +
+      '　<a class="btn small" href="/skins/example-skin.zip" download="示例皮肤包.zip">下载完整 ZIP 示例</a></p>' +
       '</div>';
     openModal('皮肤制作规范', h, null, '知道了');
   }
@@ -761,12 +760,17 @@
     xhr.send(body !== undefined && body !== null ? utf8Bytes(JSON.stringify(body)) : null);
   }
 
-  function apiFile(method, path, blob, onProgress, cb) {
+  function apiFile(method, path, blob, onProgress, cb, headers) {
     var xhr = new XMLHttpRequest();
     xhr.open(method, path, true);
     xhr.timeout = 0;
     if (S.token) xhr.setRequestHeader('X-Token', S.token);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    if (headers) {
+      for (var hk in headers) {
+        if (Object.prototype.hasOwnProperty.call(headers, hk)) xhr.setRequestHeader(hk, headers[hk]);
+      }
+    }
     if (xhr.upload && onProgress) {
       xhr.upload.onprogress = function (e) { onProgress(e.loaded, e.total); };
     }
@@ -1140,7 +1144,7 @@
     if (!a.enabled || !(a.content || a.title)) return '';
     var h = '<div class="card"><div class="card-h">📢 ' +
       (a.title ? esc(a.title) : '官方公告') + '</div>' +
-      '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.7;white-space:pre-wrap">' +
+      '<div style="padding:11px 13px;font-size:13px;color:var(--fg-2);line-height:1.7;white-space:pre-wrap">' +
       esc(a.content) + '</div></div>';
     return h;
   }
@@ -1159,10 +1163,10 @@
         '<span class="badge">全员可发言</span>' +
         '<span class="badge">' + num(S.onlineCount) + ' 人同时在线</span></div>' +
         '<div class="r-sub">' + pub.memberCount + ' 人已加入 · 所有登录用户均可发送文字/图片/视频/文件</div></div>' +
-        '<span style="color:#8b949e">›</span></div></div>';
+        '<span style="color:var(--fg-3)">›</span></div></div>';
       h += announcementHtml();
       h += '<div class="card"><div class="card-h">💡 提示</div>' +
-        '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.7">' +
+        '<div style="padding:11px 13px;font-size:13px;color:var(--fg-2);line-height:1.7">' +
         '公共聊天室对所有登录用户开放，无需加入即可发言。<br>' +
         '单文件上限 200MB，支持分片上传与断点续传。<br>' +
         '消息发送后 2 分钟内可撤回；删除仅对自己隐藏；直接删除可随时彻底清除。</div></div>';
@@ -1212,7 +1216,7 @@
           (r.dissolved ? '<span class="badge warn">已解散</span>' : '') + '</div>' +
           '<div class="r-sub">' + r.memberCount + ' 人' + (r.joined ? '' : ' · 未加入') +
           (r.dissolved ? ' · 仅可查看历史' : '') + '</div></div>' +
-          '<span style="color:#8b949e">›</span></div>';
+          '<span style="color:var(--fg-3)">›</span></div>';
       }
     }
     h += '</div>';
@@ -1607,7 +1611,7 @@
       '</div></div>';
 
     h += '<div class="card"><div class="card-h">功能说明</div>' +
-      '<div style="padding:11px 13px;font-size:13px;color:#57606a;line-height:1.8">' +
+      '<div style="padding:11px 13px;font-size:13px;color:var(--fg-2);line-height:1.8">' +
       '· 数据全部存储在服务端，设备关机后其它设备仍可正常收发<br>' +
       '· 多端同步：同一账号在任意设备登录，历史消息与文件一致<br>' +
       '· 公共聊天室 / 自定义房间 / 私聊 均可发送文字与文件<br>' +
@@ -1926,7 +1930,7 @@
   function doClearCache() {
     openModal('清除缓存',
       '<div>将释放本机缓存占用的存储空间（网页缓存、图片与文件副本等）。</div>' +
-      '<div style="margin-top:6px;color:#57606a;font-size:13px">不会删除聊天记录，也不会影响服务器端数据。</div>',
+      '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">不会删除聊天记录，也不会影响服务器端数据。</div>',
       function () {
         if (NATIVE) {
           nativeCall('clearCache', {}, function (err, d) {
@@ -1981,7 +1985,7 @@
     openModal('清除本机聊天记录',
       '<div class="set-warn">⚠️ 此操作仅影响本地数据</div>' +
       '<div style="margin-top:8px">将清除<b>本机</b>缓存的聊天记录，并让这些记录<b>在本机不再显示</b>。</div>' +
-      '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+      '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
       '服务器端数据<b>不会被删除</b> —— 其它设备、其它用户仍能看到这些记录。</div>',
       function () {
         doClearChatConfirm();
@@ -1992,7 +1996,7 @@
   function doClearChatConfirm() {
     openModal('再次确认',
       '<div>确认清除<b>本机</b>已缓存的全部聊天记录？</div>' +
-      '<div style="margin-top:6px;color:#bc4c00;font-size:13px">仅影响本地数据；服务器端记录保留不变。</div>',
+      '<div style="margin-top:6px;color:var(--warn);font-size:13px">仅影响本地数据；服务器端记录保留不变。</div>',
       function () { performClearChat(); }, '确认清除');
   }
 
@@ -2087,7 +2091,7 @@
     if (!NATIVE) {
       openModal('自定义下载路径',
         '<div>网页版的下载位置由浏览器 / 系统决定，通常是「下载」文件夹，无法在页面里改。</div>' +
-        '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+        '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
         '在 Android 客户端里打开「设置 → 下载保存位置」即可自选目录（如手机任意文件夹）。</div>',
         function () { }, '知道了');
       return;
@@ -2181,7 +2185,7 @@
     openModal('创建房间',
       '<input id="rn" type="text" placeholder="房间名称（最多40字）" maxlength="40">' +
       '<input id="rp" type="text" placeholder="房间密码（留空=免密，至少4位）">' +
-      '<div style="font-size:12px;color:#8b949e;margin-top:8px">免密房间可直接进入，加入后才能发言；<br>有密码房间需输入正确密码才能进入并加入。</div>',
+      '<div style="font-size:12px;color:var(--fg-3);margin-top:8px">免密房间可直接进入，加入后才能发言；<br>有密码房间需输入正确密码才能进入并加入。</div>',
       function () {
         var name = $('rn').value.trim();
         var pwd = $('rp').value;
@@ -2476,10 +2480,10 @@
       '<div style="margin-top:8px">将从服务器端<b>彻底删除</b>这条消息，' +
       '<b>所有设备、所有用户</b>的界面上都会立即消失。</div>' +
       (isFile
-        ? '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+        ? '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
           '消息携带的文件会一并删除，云端占用的存储空间同时释放。</div>'
         : '') +
-      '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+      '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
       '若只想让<b>自己</b>看不到，请改用「删除」。</div>',
       function () {
         api('POST', '/api/messages/' + m.id + '/purge', {}, function (err) {
@@ -2695,9 +2699,9 @@
       '<div class="set-warn">⚠️ 此操作不可恢复</div>' +
       '<div style="margin-top:8px">将从服务器端<b>彻底删除</b>选中的 <b>' + ids.length +
       '</b> 条消息，<b>所有设备、所有用户</b>的界面上都会立即消失。</div>' +
-      '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+      '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
       '消息携带的文件会一并删除，云端占用的存储空间同时释放。</div>' +
-      '<div style="margin-top:6px;color:#57606a;font-size:13px">' +
+      '<div style="margin-top:6px;color:var(--fg-2);font-size:13px">' +
       '只有<b>自己发送</b>的消息能被彻底删除；他人的消息会被跳过。' +
       '若只想让<b>自己</b>看不到，请改用「删除」。</div>',
       function () {
@@ -3241,7 +3245,7 @@
 
   function doKick(uid, name) {
     closeModal();
-    openModal('踢出 ' + name, '<div style="font-size:13px;color:#57606a">确认将该成员移出房间？</div>',
+    openModal('踢出 ' + name, '<div style="font-size:13px;color:var(--fg-2)">确认将该成员移出房间？</div>',
       function () {
         api('POST', '/api/rooms/' + S.room.id + '/kick', { userId: uid }, function (err) {
           if (err) { toast(err.message); return; }
@@ -3274,7 +3278,7 @@
     if (!options) { toast('你没有可任命的职级'); return; }
     openModal('任命 ' + name,
       '<select id="arole">' + options + '</select>' +
-      '<div style="font-size:12px;color:#8b949e;margin-top:8px">' +
+      '<div style="font-size:12px;color:var(--fg-3);margin-top:8px">' +
       '当前职级：' + NAMES[curRole] + '　可调整为更低的职级<br>' +
       '官职权限逐级递减：群主 &gt; 丞相 &gt; 县令 &gt; 乡长 &gt; 百姓</div>',
       function () {
