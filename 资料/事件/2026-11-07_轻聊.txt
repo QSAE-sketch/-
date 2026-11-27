@@ -208,3 +208,10 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
   - gradle.properties 加 android.overridePathCheck=true（工程路径含中文）
   - JDK17+Gradle8.9 编译成功，APK 136KB（classes.dex 111432B），minSdk19 兼容红米 Note 2，aapt badging=2.7.1/code32
   - 成品存 资料/游戏成果/轻聊/轻聊.apk（gitignore 不入库）+ 说明更新；无第三方依赖保持轻量
+
+· 2026-11-27 线上修复（2.7.2/code33）：皮肤标题字看不清
+  - 根因：12 套内置皮肤预览图的深色版标题条用浅主色底 + 写死白字，WCAG 对比度仅 1.8~2.9（可读线 4.5）；字号 10px 在 92×62 缩略图里缩到约 3px
+  - tools/gen-skins.py：lum 改 WCAG 相对亮度 + 新增 contrast()，on_accent 按对比度自动选黑/白字；预览标题字号 10→15px；对比度不足时改中性底承托
+  - 顶栏字色同步按对比度选；薄荷浅色主色 #178a5a→#107148、赤章 #e0341f→#c62c19 微调加深；12 套顶栏+预览标题对比度全部≥4.5
+  - test/skins.js 新增对比度回归断言；本地/云端各 798/0；CDP 缩略图截图确认标题可读；线上 version=2.7.2、字色/主色/日志均核验通过；已发布
+  - APK 不含皮肤，本次无需重编

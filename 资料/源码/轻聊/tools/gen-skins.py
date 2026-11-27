@@ -24,13 +24,13 @@ SKINS = [
      ('#e9e6df','#fbfaf6','#141210','#6f6a60','#c9c4b6','#5c5548'),
      ('#161615','#20201e','#e9e6df','#8a857a','#393832','#b8b2a6')),
     ('vermilion','赤章 VERMILION',2,'sans',
-     ('#ffffff','#ffffff','#0d0d0d','#8a8a8a','#e6e6e6','#e0341f'),
+     ('#ffffff','#ffffff','#0d0d0d','#8a8a8a','#e6e6e6','#c62c19'),
      ('#1a0f0e','#261716','#f7efed','#a8908c','#4a2824','#ff6b57')),
     ('parchment','羊皮 PARCHMENT',6,'serif',
      ('#f6ecd6','#fdf7e6','#33311f','#9c9070','#e4d6b4','#2f4f8f'),
      ('#1b1a14','#26251c','#f0e6cf','#a79a7c','#3a3728','#7fa0d8')),
     ('mint','薄荷 MINT',18,'sans',
-     ('#dff3e8','#eafaf1','#132018','#5f7a69','#bfe3ce','#178a5a'),
+     ('#dff3e8','#eafaf1','#132018','#5f7a69','#bfe3ce','#107148'),
      ('#0d1c14','#13291d','#e6f5ec','#88a895','#28503b','#5ad6a0')),
     ('nightgold','夜金 NIGHT GOLD',4,'serif',
      ('#f7f2e6','#fffcf5','#2b2416','#8d8268','#ded3b6','#8a6b1f'),
@@ -76,12 +76,23 @@ def rgba(c, a):
 
 
 def lum(c):
-    r, g, b = [v / 255 for v in hx(c)]
+    """WCAG 相对亮度（先线性化再加权），用于计算对比度。"""
+    def lin(v):
+        v = v / 255
+        return v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+    r, g, b = [lin(x) for x in hx(c)]
     return 0.2126 * r + 0.7152 * g + 0.0722 * b
 
 
+def contrast(a, b):
+    """WCAG 对比度，范围 1~21；正文至少 4.5，大号/标题至少 3。"""
+    x, y = sorted((lum(a), lum(b)), reverse=True)
+    return (x + 0.05) / (y + 0.05)
+
+
 def on_accent(accent):
-    return '#ffffff' if lum(accent) < 0.55 else '#151515'
+    """在白/深字里选对比度更高的一个，保证顶栏文字看得清。"""
+    return '#ffffff' if contrast(accent, '#ffffff') >= contrast(accent, '#151515') else '#151515'
 
 
 def vars_for(bg, surface, fg, muted, border, accent, dark):
@@ -168,24 +179,44 @@ def block(selector, v):
 
 
 def preview_svg(name, light, dark, accent):
+    """预览图：标题条文字按背景对比度自动选黑/白，字号足够大。
+
+    缩略图只有 92x62，原 SVG 320x200 会被压到约 0.29 倍，
+    因此标题字放大到 15px（缩放后约 4.3px）并用 bold，且必须保证对比度 >= 4.5。
+    """
     bg, surface, fg, border, ac = light[0], light[1], light[2], light[4], light[5]
+    d_bg, d_surf, d_border, d_ac = dark[0], dark[1], dark[4], dark[5]
+    # 标题条文字色：对比度优先（浅/深主色都可能很亮，不能一律白字）
+    ac_on = on_accent(ac)
+    d_ac_on = on_accent(d_ac)
+    # 条上对比度不足 4.5 时，改用中性深/浅底承托文字，保证可读
+    if contrast(ac, ac_on) < 4.5:
+        bar, bar_on = (fg, surface)
+    else:
+        bar, bar_on = (ac, ac_on)
+    if contrast(d_ac, d_ac_on) < 4.5:
+        d_bar, d_bar_on = (d_surf, dark[2])
+    else:
+        d_bar, d_bar_on = (d_ac, d_ac_on)
     return '''<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
 <rect width="320" height="200" fill="{bg}"/>
 <rect x="10" y="10" width="146" height="180" rx="9" fill="{surface}" stroke="{border}" stroke-width="1"/>
-<rect x="10" y="10" width="146" height="26" rx="9" fill="{ac}"/>
-<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">{name}</text>
-<rect x="22" y="46" width="104" height="18" rx="6" fill="{border}" opacity=".4"/>
-<rect x="22" y="72" width="112" height="22" rx="6" fill="{surface}" stroke="{border}"/>
-<rect x="36" y="110" width="98" height="22" rx="6" fill="{ac}" opacity=".55"/>
+<rect x="10" y="10" width="146" height="30" rx="9" fill="{bar}"/>
+<text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="{bar_on}">{name}</text>
+<rect x="20" y="50" width="104" height="18" rx="6" fill="{border}" opacity=".4"/>
+<rect x="20" y="76" width="112" height="22" rx="6" fill="{surface}" stroke="{border}"/>
+<rect x="34" y="114" width="98" height="22" rx="6" fill="{ac}" opacity=".55"/>
 <rect x="166" y="10" width="144" height="180" rx="9" fill="{d_bg}" stroke="{d_border}" stroke-width="1"/>
-<rect x="166" y="10" width="144" height="26" rx="9" fill="{d_ac}"/>
-<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">{name}</text>
-<rect x="178" y="46" width="102" height="18" rx="6" fill="{d_border}" opacity=".5"/>
-<rect x="178" y="72" width="118" height="22" rx="6" fill="{d_surf}" stroke="{d_border}"/>
-<rect x="192" y="110" width="106" height="22" rx="6" fill="{d_ac}" opacity=".7"/>
+<rect x="166" y="10" width="144" height="30" rx="9" fill="{d_bar}"/>
+<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="{d_bar_on}">{name}</text>
+<rect x="176" y="50" width="102" height="18" rx="6" fill="{d_border}" opacity=".5"/>
+<rect x="176" y="76" width="118" height="22" rx="6" fill="{d_surf}" stroke="{d_border}"/>
+<rect x="190" y="114" width="106" height="22" rx="6" fill="{d_ac}" opacity=".7"/>
 </svg>
 '''.format(name=name, bg=bg, surface=surface, border=border, ac=ac,
-           d_bg=dark[0], d_surf=dark[1], d_border=dark[4], d_ac=dark[5])
+           bar=bar, bar_on=bar_on,
+           d_bg=d_bg, d_surf=d_surf, d_border=d_border, d_ac=d_ac,
+           d_bar=d_bar, d_bar_on=d_bar_on)
 
 
 def main():

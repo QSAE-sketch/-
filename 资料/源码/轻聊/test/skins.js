@@ -98,6 +98,39 @@ function makeZip(files) {
   }
   check('12 套新皮肤都有浅深两套不同配色和风格样式', pairOk === 12, pairOk);
 
+  // 1c. 顶栏 / 预览标题条的文字对比度（防止字色和背景太接近看不清）
+  const relLum = (hex) => {
+    const h = hex.replace('#', '');
+    const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    return 0.2126 * lin(parseInt(h.slice(0, 2), 16)) +
+           0.7152 * lin(parseInt(h.slice(2, 4), 16)) +
+           0.0722 * lin(parseInt(h.slice(4, 6), 16));
+  };
+  const wcag = (a, b) => {
+    const x = Math.max(relLum(a), relLum(b)), y = Math.min(relLum(a), relLum(b));
+    return (x + 0.05) / (y + 0.05);
+  };
+  let contrastOk = 0, contrastBad = [];
+  for (const id of NEW_SKIN_IDS) {
+    const css = readSkinCss(id);
+    const pv = fs.readFileSync(path.join(__dirname, '..', 'public', 'skins', id, 'preview.svg'), 'utf8');
+    const split = css.indexOf('data-theme="dark"');
+    const segments = [css.slice(0, split), css.slice(split)];
+    const bars = pv.match(/<rect[^>]*height="30"[^>]*fill="([^"]+)"/g) || [];
+    const textFills = pv.match(/<text[^>]*fill="([^"]+)"/g) || [];
+    let allOk = true;
+    for (let s = 0; s < 2; s++) {
+      const tbg = (segments[s].match(/--topbar-bg:\s*(#[0-9a-f]{6})/i) || [])[1];
+      const tfg = (segments[s].match(/--topbar-fg:\s*(#[0-9a-f]{6})/i) || [])[1];
+      if (!tbg || !tfg || wcag(tbg, tfg) < 4.5) { allOk = false; break; }
+      const bar = (bars[s] || '').match(/fill="(#[0-9a-f]{6})"/i);
+      const fill = (textFills[s] || '').match(/fill="(#[0-9a-f]{6})"/i);
+      if (!bar || !fill || wcag(bar[1], fill[1]) < 4.5) { allOk = false; break; }
+    }
+    if (allOk) contrastOk++; else contrastBad.push(id);
+  }
+  check('12 套皮肤顶栏/预览标题条文字对比度均≥4.5', contrastOk === 12, contrastBad);
+
   // 1b. 直接上传一份 CSS 就能做皮肤（自动生成 manifest 和预览图）
   const cssText = ':root{--bg:#abcdef}\n:root[data-theme="dark"]{--bg:#101010}';
   r = await req('POST', '/api/skins', null, ta, Buffer.from(cssText, 'utf8'),

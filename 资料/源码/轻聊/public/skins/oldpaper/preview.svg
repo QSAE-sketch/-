@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
 <rect width="320" height="200" fill="#e5decd"/>
 <rect x="10" y="10" width="146" height="180" rx="9" fill="#f4eee0" stroke="#cfc4ac" stroke-width="1"/>
-<rect x="10" y="10" width="146" height="26" rx="9" fill="#8e3a2c"/>
-<text x="22" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">古纸</text>
-<rect x="22" y="46" width="104" height="18" rx="6" fill="#cfc4ac" opacity=".4"/>
-<rect x="22" y="72" width="112" height="22" rx="6" fill="#f4eee0" stroke="#cfc4ac"/>
-<rect x="36" y="110" width="98" height="22" rx="6" fill="#8e3a2c" opacity=".55"/>
+<rect x="10" y="10" width="146" height="30" rx="9" fill="#8e3a2c"/>
+<text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#ffffff">古纸</text>
+<rect x="20" y="50" width="104" height="18" rx="6" fill="#cfc4ac" opacity=".4"/>
+<rect x="20" y="76" width="112" height="22" rx="6" fill="#f4eee0" stroke="#cfc4ac"/>
+<rect x="34" y="114" width="98" height="22" rx="6" fill="#8e3a2c" opacity=".55"/>
 <rect x="166" y="10" width="144" height="180" rx="9" fill="#1c1710" stroke="#3f3325" stroke-width="1"/>
-<rect x="166" y="10" width="144" height="26" rx="9" fill="#d98f75"/>
-<text x="178" y="28" font-family="Arial,sans-serif" font-size="10" font-weight="bold" fill="#fff">古纸</text>
-<rect x="178" y="46" width="102" height="18" rx="6" fill="#3f3325" opacity=".5"/>
-<rect x="178" y="72" width="118" height="22" rx="6" fill="#282117" stroke="#3f3325"/>
-<rect x="192" y="110" width="106" height="22" rx="6" fill="#d98f75" opacity=".7"/>
+<rect x="166" y="10" width="144" height="30" rx="9" fill="#d98f75"/>
+<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#151515">古纸</text>
+<rect x="176" y="50" width="102" height="18" rx="6" fill="#3f3325" opacity=".5"/>
+<rect x="176" y="76" width="118" height="22" rx="6" fill="#282117" stroke="#3f3325"/>
+<rect x="190" y="114" width="106" height="22" rx="6" fill="#d98f75" opacity=".7"/>
 </svg>
