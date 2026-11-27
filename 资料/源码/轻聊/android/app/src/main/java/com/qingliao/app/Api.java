@@ -189,6 +189,34 @@ public class Api {
         public int memberCount;
         public boolean joined, hasPassword, dissolved, muted;
         public long createdAt;
+        public String ownerName = "";
+    }
+
+    /** 好友申请（收到的 / 发出的共用） */
+    public static class FriendReq {
+        public String id = "", userId = "", username = "", nickname = "", message = "";
+    }
+
+    /** 房间搜索结果 */
+    public static class SearchRoom {
+        public String id = "", kind = "", name = "", ownerName = "";
+        public int memberCount;
+        public boolean hasPassword, joined;
+    }
+
+    /** 群成员 */
+    public static class Member {
+        public String userId = "", username = "", nickname = "", displayName = "";
+        public String role = "", roleName = "", avatar = "", avatarColor = "", initial = "";
+        public boolean founder;
+    }
+
+    /** 成员面板返回的整体信息 */
+    public static class MemberPage {
+        public List<Member> members = new ArrayList<Member>();
+        public String myRole = "", roomName = "";
+        public boolean canManage, canDissolve, publicHall, master, dissolved;
+        public String heirId = "", myRoomNickname = "";
     }
 
     public static class MsgFile {
@@ -245,6 +273,7 @@ public class Api {
         r.dissolved = o.optBoolean("dissolved", false);
         r.muted = o.optBoolean("muted", false);
         r.createdAt = o.optLong("createdAt", 0);
+        r.ownerName = o.optString("ownerName", "");
         return r;
     }
 
@@ -346,6 +375,68 @@ public class Api {
         token = "";
     }
 
+    /** 注销账号（不可逆）：成功后本地凭证必须清掉 */
+    public void deleteAccount() throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            req.put("confirm", true);
+            unwrap(postJson("/api/account/delete", req));
+            token = "";
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    /** 上传头像：走二进制体，Content-Type 由图片探测决定 */
+    public void setAvatar(File file, String mime) throws ApiException {
+        byte[] buf;
+        try {
+            FileInputStream fis = new FileInputStream(file);
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] tmp = new byte[16384];
+            int n;
+            while ((n = fis.read(tmp)) > 0) bos.write(tmp, 0, n);
+            fis.close();
+            buf = bos.toByteArray();
+        } catch (IOException e) {
+            throw new ApiException("读取图片失败");
+        }
+        JSONObject j = unwrap(request("POST", "/api/me/avatar", buf,
+                mime == null || mime.length() == 0 ? "application/octet-stream" : mime));
+        JSONObject u = j.optJSONObject("user");
+        if (u != null) user = parseUser(u);
+    }
+
+    public void clearAvatar() throws ApiException {
+        JSONObject j = unwrap(request("DELETE", "/api/me/avatar", null, null));
+        JSONObject u = j.optJSONObject("user");
+        if (u != null) user = parseUser(u);
+    }
+
+    /** 激活 / 续期最高权限 */
+    public boolean activatePerm(String key) throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            req.put("key", key);
+            JSONObject j = unwrap(postJson("/api/auth/perm", req));
+            JSONObject u = j.optJSONObject("user");
+            if (u != null) user = parseUser(u);
+            return true;
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    /** 版本 / 更新记录 / 公告（公开接口，不需要登录） */
+    public JSONObject version() throws ApiException {
+        return unwrap(get("/api/version"));
+    }
+
+    /** 公共聊天室在线人数 */
+    public int onlineCount() throws ApiException {
+        return unwrap(get("/api/online-count")).optInt("online", 0);
+    }
+
     /* ---------------- 房间 ---------------- */
 
     public List<Room> rooms() throws ApiException {
@@ -383,6 +474,103 @@ public class Api {
         return out;
     }
 
+    /** 好友页完整数据：好友 + 收到的申请 + 发出的申请 */
+    public static class FriendData {
+        public List<Friend> friends = new ArrayList<Friend>();
+        public List<FriendReq> incoming = new ArrayList<FriendReq>();
+        public List<FriendReq> outgoing = new ArrayList<FriendReq>();
+    }
+
+    public FriendData friendData() throws ApiException {
+        JSONObject j = unwrap(get("/api/friends"));
+        FriendData d = new FriendData();
+        JSONArray arr = j.optJSONArray("friends");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                Friend f = new Friend();
+                f.id = o.optString("id", "");
+                f.username = o.optString("username", "");
+                f.nickname = o.optString("nickname", f.username);
+                f.initial = o.optString("initial", "");
+                f.avatarColor = o.optString("avatarColor", "");
+                f.avatar = o.optString("avatar", "");
+                d.friends.add(f);
+            }
+        }
+        arr = j.optJSONArray("incoming");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                FriendReq r = new FriendReq();
+                r.id = o.optString("id", "");
+                r.userId = o.optString("fromId", "");
+                r.username = o.optString("username", "");
+                r.nickname = o.optString("nickname", r.username);
+                r.message = o.optString("message", "");
+                d.incoming.add(r);
+            }
+        }
+        arr = j.optJSONArray("outgoing");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                FriendReq r = new FriendReq();
+                r.id = o.optString("id", "");
+                r.userId = o.optString("toId", "");
+                r.username = o.optString("username", "");
+                r.nickname = o.optString("nickname", r.username);
+                r.message = o.optString("message", "");
+                d.outgoing.add(r);
+            }
+        }
+        return d;
+    }
+
+    /** 按账号名/昵称搜索用户，用于加好友 */
+    public List<Friend> searchUsers(String q) throws ApiException {
+        JSONObject j = unwrap(get("/api/users?q=" + encode(q)));
+        List<Friend> out = new ArrayList<Friend>();
+        JSONArray arr = j.optJSONArray("users");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                Friend f = new Friend();
+                f.id = o.optString("id", "");
+                f.username = o.optString("username", "");
+                f.nickname = o.optString("nickname", f.username);
+                f.initial = o.optString("initial", "");
+                f.avatarColor = o.optString("avatarColor", "");
+                f.avatar = o.optString("avatar", "");
+                out.add(f);
+            }
+        }
+        return out;
+    }
+
+    public void requestFriend(String username, String message) throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            if (username != null && username.length() > 0) req.put("username", username);
+            if (message != null && message.length() > 0) req.put("message", message);
+            unwrap(postJson("/api/friends/request", req));
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    public void acceptFriend(String reqId) throws ApiException {
+        unwrap(postJson("/api/friends/" + reqId + "/accept", new JSONObject()));
+    }
+
+    public void rejectFriend(String reqId) throws ApiException {
+        unwrap(postJson("/api/friends/" + reqId + "/reject", new JSONObject()));
+    }
+
     /** 打开/获取与某个好友的私聊（服务端按 pairKey 复用同一条会话）。 */
     public Room dm(String userId) throws ApiException {
         JSONObject j = unwrap(get("/api/dm/" + userId));
@@ -399,6 +587,130 @@ public class Api {
         } catch (JSONException e) {
             throw new ApiException("请求构造失败");
         }
+    }
+
+    /** 搜索房间（私聊不出现在结果里，和网页一致） */
+    public List<SearchRoom> searchRooms(String q) throws ApiException {
+        JSONObject j = unwrap(get("/api/rooms/search?q=" + encode(q)));
+        List<SearchRoom> out = new ArrayList<SearchRoom>();
+        JSONArray arr = j.optJSONArray("results");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                SearchRoom s = new SearchRoom();
+                s.id = o.optString("id", "");
+                s.kind = o.optString("kind", "");
+                s.name = o.optString("name", "");
+                s.ownerName = o.optString("ownerName", "");
+                s.memberCount = o.optInt("memberCount", 0);
+                s.hasPassword = o.optBoolean("hasPassword", false);
+                s.joined = o.optBoolean("joined", false);
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    /** 验证房间密码：通过后服务端在会话里记住权限，join 直接调用即可 */
+    public void verifyRoom(String roomId, String password) throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            req.put("password", password);
+            unwrap(postJson("/api/rooms/" + roomId + "/verify", req));
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    public void joinRoom(String roomId) throws ApiException {
+        unwrap(postJson("/api/rooms/" + roomId + "/join", new JSONObject()));
+    }
+
+    public void leaveRoom(String roomId) throws ApiException {
+        unwrap(postJson("/api/rooms/" + roomId + "/leave", new JSONObject()));
+    }
+
+    /** 成员面板 */
+    public MemberPage members(String roomId) throws ApiException {
+        JSONObject j = unwrap(get("/api/rooms/" + roomId + "/members"));
+        MemberPage p = new MemberPage();
+        p.myRole = j.optString("myRole", "");
+        p.roomName = j.optString("roomName", "");
+        p.heirId = j.optString("heirId", "");
+        p.myRoomNickname = j.optString("myRoomNickname", "");
+        p.canManage = j.optBoolean("canManage", false);
+        p.canDissolve = j.optBoolean("canDissolve", false);
+        p.publicHall = j.optBoolean("publicHall", false);
+        p.master = j.optBoolean("master", false);
+        p.dissolved = j.optBoolean("dissolved", false);
+        JSONArray arr = j.optJSONArray("members");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                Member m = new Member();
+                m.userId = o.optString("userId", "");
+                m.username = o.optString("username", "");
+                m.nickname = o.optString("nickname", "");
+                m.displayName = o.optString("displayName", m.nickname);
+                m.role = o.optString("role", "");
+                m.roleName = o.optString("roleName", "");
+                m.avatar = o.optString("avatar", "");
+                m.avatarColor = o.optString("avatarColor", "");
+                m.initial = o.optString("initial", "");
+                m.founder = o.optBoolean("founder", false);
+                p.members.add(m);
+            }
+        }
+        return p;
+    }
+
+    public void kickMember(String roomId, String userId) throws ApiException {
+        JSONObject req = new JSONObject();
+        try { req.put("userId", userId); } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/kick", req));
+    }
+
+    public void setMute(String roomId, String userId, int minutes) throws ApiException {
+        JSONObject req = new JSONObject();
+        try {
+            req.put("userId", userId);
+            req.put("minutes", minutes);
+        } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/mute", req));
+    }
+
+    public void transferOwner(String roomId, String userId) throws ApiException {
+        JSONObject req = new JSONObject();
+        try {
+            req.put("userId", userId);
+            req.put("confirm", true);
+        } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/transfer", req));
+    }
+
+    public void setHeir(String roomId, String userId) throws ApiException {
+        JSONObject req = new JSONObject();
+        try { req.put("heirId", userId == null ? "" : userId); } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/heir", req));
+    }
+
+    public void dissolveRoom(String roomId) throws ApiException {
+        JSONObject req = new JSONObject();
+        try { req.put("confirm", true); } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/dissolve", req));
+    }
+
+    public void setRoomNickname(String roomId, String nickname) throws ApiException {
+        JSONObject req = new JSONObject();
+        try { req.put("nickname", nickname == null ? "" : nickname); } catch (JSONException ignored) { }
+        unwrap(postJson("/api/rooms/" + roomId + "/nickname", req));
+    }
+
+    private static String encode(String s) {
+        try { return java.net.URLEncoder.encode(s == null ? "" : s, "utf-8"); }
+        catch (Exception e) { return s == null ? "" : s; }
     }
 
     /* ---------------- 消息 ---------------- */

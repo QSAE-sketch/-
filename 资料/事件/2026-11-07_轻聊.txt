@@ -199,3 +199,12 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
   - 皮肤中心加「默认外观」卡片（data-skin-use="" → skinApply('')），可一键切回原始样式
   - 全部 window.confirm/prompt 换成应用内 askConfirm/askInput 弹层（手机 WebView 屏蔽原生弹窗导致注销/网盘操作点了没反应）；覆盖注销账号、最高权限注销、改昵称、头像恢复、遗产继承人、房间昵称/转让/解散/清空、网盘重命名/移动/删除/彻底删除
   - alert 同步改 toast；新增 tools/verify-interactions.js（CDP 端到端 9/9）；本地/云端各 797/0；线上 2.7.1 版本号核验通过；已发布
+
+· 2026-11-27 APK 大更新（2.7.1/code32，与线上同版本）：
+  - 用户诉求：红米 APK 功能太少，除网盘外全部功能都加上；APK 不需要皮肤；尽可能小（上一版几秒装完）
+  - Api.java 补接口：好友数据/申请收发/用户搜索、房间搜索/加入/验证密码/离开、成员列表/踢人/禁言/转让/继承人/解散/房间昵称、头像上传与恢复、注销账号、最高权限激活、版本与公告、在线人数
+  - MainActivity 补入口：好友中心（申请红包+好友列表+发出申请+搜索加好友）、发现（搜房间/新建/搜用户）、点标题进成员面板并管理、更换头像、注销账号、权限激活、更新记录/公告、在线人数
+  - 明确不含网盘与皮肤：DEX 字符串校验「网盘/皮肤/skins/drive」全部 no
+  - gradle.properties 加 android.overridePathCheck=true（工程路径含中文）
+  - JDK17+Gradle8.9 编译成功，APK 136KB（classes.dex 111432B），minSdk19 兼容红米 Note 2，aapt badging=2.7.1/code32
+  - 成品存 资料/游戏成果/轻聊/轻聊.apk（gitignore 不入库）+ 说明更新；无第三方依赖保持轻量

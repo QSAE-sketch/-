@@ -91,6 +91,9 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
         btnRooms.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showRooms(); }
         });
+        tvTitle.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { showMembers(); }
+        });
         btnMe.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { showMe(); }
         });
@@ -138,6 +141,26 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
     private void gotoLogin() {
         startActivity(new Intent(this, LoginActivity.class));
         finish();
+    }
+
+    /** 后台跑一个网络任务，主线程回调结果（统一错误处理） */
+    private interface BgCall { void run() throws Exception; }
+    private interface BgDone { void onDone(String error); }
+    private void bg(final BgCall call, final BgDone done) {
+        new Thread(new Runnable() {
+            public void run() {
+                final String[] err = new String[1];
+                try { call.run(); } catch (Exception e) {
+                    err[0] = e.getMessage() == null ? "操作失败" : e.getMessage();
+                }
+                runOnUiThread(new Runnable() {
+                    public void run() { done.onDone(err[0]); }
+                });
+            }
+        }).start();
+    }
+    private void errToast(String e) {
+        if (e != null) toast(e);
     }
 
     /* ---------------- 房间 ---------------- */
@@ -200,60 +223,185 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
             String tag = "public".equals(r.kind) ? "公共" : (r.memberCount + " 人");
             names[i] = r.name + "　（" + tag + "）";
         }
-        names[rooms.size()] = "👤 好友私聊…";
+        names[rooms.size()] = "👤 好友与私聊…";
         new AlertDialog.Builder(this)
                 .setTitle("选择聊天")
                 .setItems(names, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int which) {
-                        if (which == rooms.size()) { showFriendDms(); return; }
+                        if (which == rooms.size()) { showFriends(); return; }
                         openRoom(rooms.get(which));
                     }
                 })
-                .setNeutralButton("新建房间", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface d, int w) { newRoom(); }
+                .setNeutralButton("更多（搜索 / 新建）", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) { showRoomTools(); }
                 })
                 .setNegativeButton("取消", null)
                 .show();
     }
 
-    /** 好友列表：点某位好友就进入与他的私聊（不是房间） */
-    private void showFriendDms() {
+    /** 房间工具：搜索房间 / 新建房间 / 搜索用户加好友 */
+    private void showRoomTools() {
+        final String[] items = {"🔍 搜索房间并加入", "➕ 新建房间", "👤 搜索用户加好友"};
+        new AlertDialog.Builder(this)
+                .setTitle("发现")
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) searchRoomDialog();
+                        else if (which == 1) newRoom();
+                        else searchUserDialog();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /** 好友中心：收到的申请 → 好友列表（点一下私聊）→ 我发出的 → 搜索加好友 */
+    private void showFriends() {
         toast("正在加载好友…");
-        new Thread(new Runnable() {
-            public void run() {
-                try {
-                    final List<Api.Friend> fs = api.friends();
-                    runOnUiThread(new Runnable() {
-                        public void run() {
-                            if (fs.isEmpty()) {
-                                toast("还没有好友，先在网页版「好友」里添加");
-                                return;
-                            }
-                            final String[] names = new String[fs.size()];
-                            for (int i = 0; i < fs.size(); i++) {
-                                Api.Friend f = fs.get(i);
-                                names[i] = f.nickname + "　（" + f.username + "）";
-                            }
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setTitle("好友私聊")
-                                    .setItems(names, new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface d, int which) {
-                                            openDm(fs.get(which));
-                                        }
-                                    })
-                                    .setNegativeButton("取消", null)
-                                    .show();
-                        }
-                    });
-                } catch (final Exception e) {
-                    final String msg = (e instanceof Api.ApiException)
-                            ? ((Api.ApiException) e).getMessage() : String.valueOf(e.getMessage());
-                    runOnUiThread(new Runnable() {
-                        public void run() { toast("加载好友失败：" + msg); }
-                    });
+        bg(new BgCall() {
+            public void run() throws Exception { friendData = api.friendData(); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("加载好友失败：" + e); return; }
+                final Api.FriendData d = friendData;
+                List<String> rows = new ArrayList<String>();
+                for (int i = 0; i < d.incoming.size(); i++) {
+                    Api.FriendReq r = d.incoming.get(i);
+                    rows.add("🔔 申请：" + r.nickname + "（" + r.username + "）");
                 }
+                for (int i = 0; i < d.friends.size(); i++) {
+                    Api.Friend f = d.friends.get(i);
+                    rows.add("💬 " + f.nickname + "（" + f.username + "）");
+                }
+                for (int i = 0; i < d.outgoing.size(); i++) {
+                    Api.FriendReq r = d.outgoing.get(i);
+                    rows.add("⏳ 已申请：" + r.nickname);
+                }
+                if (rows.isEmpty()) rows.add("还没有好友，点「加好友」搜索");
+                final String[] names = rows.toArray(new String[0]);
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("好友与私聊")
+                        .setItems(names, new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dialog, int which) {
+                                handleFriendRow(d, which);
+                            }
+                        })
+                        .setPositiveButton("加好友", new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dd, int w) { searchUserDialog(); }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
             }
-        }).start();
+        });
+    }
+
+    private Api.FriendData friendData;
+
+    /** 好友行点击：收到的申请弹处理框，好友直接进私聊 */
+    private void handleFriendRow(final Api.FriendData d, int which) {
+        int i = which;
+        if (i < d.incoming.size()) {
+            final Api.FriendReq req = d.incoming.get(i);
+            String msg = req.message.length() > 0 ? ("\n留言：" + req.message) : "";
+            new AlertDialog.Builder(this)
+                    .setTitle("好友申请")
+                    .setMessage(req.nickname + "（" + req.username + "）想加你好友" + msg)
+                    .setPositiveButton("同意", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dd, int w) {
+                            bg(new BgCall() {
+                                public void run() throws Exception { api.acceptFriend(req.id); }
+                            }, new BgDone() {
+                                public void onDone(String e) {
+                                    errToast(e);
+                                    if (e == null) { toast("已添加好友"); showFriends(); }
+                                }
+                            });
+                        }
+                    })
+                    .setNegativeButton("拒绝", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dd, int w) {
+                            bg(new BgCall() {
+                                public void run() throws Exception { api.rejectFriend(req.id); }
+                            }, new BgDone() {
+                                public void onDone(String e) { errToast(e); if (e == null) showFriends(); }
+                            });
+                        }
+                    })
+                    .setNeutralButton("取消", null)
+                    .show();
+            return;
+        }
+        i -= d.incoming.size();
+        if (i < d.friends.size()) { openDm(d.friends.get(i)); return; }
+        // 发出的申请：提示等待
+        toast("等待对方同意好友申请");
+    }
+
+    /** 搜索用户加好友 */
+    private void searchUserDialog() {
+        final EditText ed = new EditText(this);
+        ed.setHint("对方账号名或昵称");
+        ed.setSingleLine(true);
+        new AlertDialog.Builder(this)
+                .setTitle("搜索用户")
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("搜索", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        final String q = ed.getText().toString().trim();
+                        if (q.length() == 0) return;
+                        doSearchUser(q);
+                    }
+                })
+                .show();
+    }
+
+    private void doSearchUser(final String q) {
+        bg(new BgCall() {
+            public void run() throws Exception { searchedUsers = api.searchUsers(q); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("搜索失败：" + e); return; }
+                final List<Api.Friend> us = searchedUsers;
+                if (us.isEmpty()) { toast("没有找到匹配的用户"); return; }
+                String[] names = new String[us.size()];
+                for (int i = 0; i < us.size(); i++) names[i] = us.get(i).nickname + "（" + us.get(i).username + "）";
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("搜索结果")
+                        .setItems(names, new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dd, int which) {
+                                sendFriendRequest(us.get(which).username);
+                            }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            }
+        });
+    }
+
+    private List<Api.Friend> searchedUsers = new ArrayList<Api.Friend>();
+
+    private void sendFriendRequest(final String username) {
+        final EditText ed = new EditText(this);
+        ed.setHint("附言（可选）");
+        new AlertDialog.Builder(this)
+                .setTitle("加好友：" + username)
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("发送申请", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface dd, int w) {
+                        final String msg = ed.getText().toString().trim();
+                        bg(new BgCall() {
+                            public void run() throws Exception { api.requestFriend(username, msg); }
+                        }, new BgDone() {
+                            public void onDone(String e) {
+                                if (e != null) { toast("申请失败：" + e); return; }
+                                toast("已发送好友申请");
+                            }
+                        });
+                    }
+                })
+                .show();
     }
 
     /** 打开与某位好友的私聊会话 */
@@ -318,6 +466,98 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
                     }
                 })
                 .show();
+    }
+
+    /** 搜索房间：结果里点一个，已加入直接进，未加入则加入（密码房先验证） */
+    private void searchRoomDialog() {
+        final EditText ed = new EditText(this);
+        ed.setHint("房间名称关键词");
+        ed.setSingleLine(true);
+        new AlertDialog.Builder(this)
+                .setTitle("搜索房间")
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("搜索", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        final String q = ed.getText().toString().trim();
+                        if (q.length() == 0) return;
+                        doSearchRoom(q);
+                    }
+                })
+                .show();
+    }
+
+    private void doSearchRoom(final String q) {
+        bg(new BgCall() {
+            public void run() throws Exception { searchedRooms = api.searchRooms(q); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("搜索失败：" + e); return; }
+                final List<Api.SearchRoom> rs = searchedRooms;
+                if (rs.isEmpty()) { toast("没有找到匹配的房间"); return; }
+                String[] names = new String[rs.size()];
+                for (int i = 0; i < rs.size(); i++) {
+                    Api.SearchRoom s = rs.get(i);
+                    names[i] = s.name + "　（" + s.memberCount + " 人"
+                            + (s.hasPassword ? " · 需密码" : "") + (s.joined ? " · 已加入" : "") + "）";
+                }
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("搜索结果")
+                        .setItems(names, new DialogInterface.OnClickListener() {
+                            public void onClick(DialogInterface dd, int which) { joinOrOpen(rs.get(which)); }
+                        })
+                        .setNegativeButton("取消", null)
+                        .show();
+            }
+        });
+    }
+
+    private List<Api.SearchRoom> searchedRooms = new ArrayList<Api.SearchRoom>();
+
+    private void joinOrOpen(final Api.SearchRoom s) {
+        if (s.joined) {
+            Api.Room r = new Api.Room();
+            r.id = s.id; r.name = s.name; r.kind = s.kind;
+            r.memberCount = s.memberCount; r.joined = true;
+            openRoom(r);
+            return;
+        }
+        if (s.hasPassword) {
+            final EditText ed = new EditText(this);
+            ed.setHint("房间密码");
+            ed.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+            new AlertDialog.Builder(this)
+                    .setTitle("输入房间密码")
+                    .setView(ed)
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("加入", new DialogInterface.OnClickListener() {
+                        public void onClick(DialogInterface dd, int w) {
+                            doJoinRoom(s, ed.getText().toString());
+                        }
+                    })
+                    .show();
+        } else {
+            doJoinRoom(s, "");
+        }
+    }
+
+    private void doJoinRoom(final Api.SearchRoom s, final String password) {
+        bg(new BgCall() {
+            public void run() throws Exception {
+                if (password.length() > 0) api.verifyRoom(s.id, password);
+                api.joinRoom(s.id);
+            }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("加入失败：" + e); return; }
+                toast("已加入房间");
+                loadRooms();
+                Api.Room r = new Api.Room();
+                r.id = s.id; r.name = s.name; r.kind = s.kind;
+                r.joined = true;
+                openRoom(r);
+            }
+        });
     }
 
     /* ---------------- 消息 ---------------- */
@@ -450,10 +690,11 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_PICK_FILE || resultCode != RESULT_OK || data == null) return;
+        if (resultCode != RESULT_OK || data == null) return;
         Uri uri = data.getData();
         if (uri == null) return;
-        uploadUri(uri);
+        if (requestCode == REQ_PICK_FILE) uploadUri(uri);
+        else if (requestCode == REQ_PICK_AVATAR) uploadAvatar(uri);
     }
 
     private String displayName(Uri uri) {
@@ -599,19 +840,360 @@ public class MainActivity extends Activity implements MsgAdapter.Listener {
                 .show();
     }
 
+    /* ---------------- 成员管理 ---------------- */
+
+    private void showMembers() {
+        if (roomId.length() == 0) return;
+        bg(new BgCall() {
+            public void run() throws Exception { memberPage = api.members(roomId); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("加载成员失败：" + e); return; }
+                showMembersDialog(memberPage);
+            }
+        });
+    }
+
+    private Api.MemberPage memberPage;
+
+    private void showMembersDialog(final Api.MemberPage p) {
+        List<String> rows = new ArrayList<String>();
+        for (int i = 0; i < p.members.size(); i++) {
+            Api.Member m = p.members.get(i);
+            rows.add(m.displayName + "　（" + m.roleName + "）");
+        }
+        final String[] names = rows.toArray(new String[0]);
+        AlertDialog.Builder b = new AlertDialog.Builder(this).setTitle("成员（" + p.members.size() + "）");
+        if (names.length > 0) {
+            b.setItems(names, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface d, int which) { memberAction(p, p.members.get(which)); }
+            });
+        } else {
+            b.setMessage("暂无成员");
+        }
+        // 群主/管理才显示管理动作；解散按服务端 canDissolve 判断
+        if (p.canManage) {
+            b.setNeutralButton("管理", new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface d, int w) { showManageMenu(p); }
+            });
+        }
+        b.setNegativeButton("关闭", null).show();
+    }
+
+    private void memberAction(final Api.MemberPage p, final Api.Member m) {
+        if (!p.canManage) { toast("只有管理才能操作成员"); return; }
+        final String[] acts = {"设为继承人", "禁言 10 分钟", "禁言 1 天", "踢出房间", "转让群主"};
+        new AlertDialog.Builder(this)
+                .setTitle(m.displayName + "（" + m.roleName + "）")
+                .setItems(acts, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) memberTask("设置继承人", new BgCall() {
+                            public void run() throws Exception { api.setHeir(roomId, m.userId); }
+                        });
+                        else if (which == 1) memberTask("禁言 10 分钟", new BgCall() {
+                            public void run() throws Exception { api.setMute(roomId, m.userId, 10); }
+                        });
+                        else if (which == 2) memberTask("禁言 1 天", new BgCall() {
+                            public void run() throws Exception { api.setMute(roomId, m.userId, 1440); }
+                        });
+                        else if (which == 3) memberTask("踢出", new BgCall() {
+                            public void run() throws Exception { api.kickMember(roomId, m.userId); }
+                        });
+                        else memberTask("转让群主", new BgCall() {
+                            public void run() throws Exception { api.transferOwner(roomId, m.userId); }
+                        });
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void memberTask(final String label, final BgCall call) {
+        bg(call, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast(label + "失败：" + e); return; }
+                toast("已" + label);
+                showMembers();
+            }
+        });
+    }
+
+    private void showManageMenu(final Api.MemberPage p) {
+        List<String> items = new ArrayList<String>();
+        items.add("修改我在本房间的昵称");
+        if (p.canDissolve) items.add(p.publicHall ? "解散公共大厅" : "解散房间");
+        final String[] arr = items.toArray(new String[0]);
+        new AlertDialog.Builder(this)
+                .setTitle("房间管理")
+                .setItems(arr, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) roomNickDialog(p);
+                        else confirmDissolve();
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void roomNickDialog(final Api.MemberPage p) {
+        final EditText ed = new EditText(this);
+        ed.setText(p.myRoomNickname);
+        ed.setHint("留空恢复全局昵称");
+        new AlertDialog.Builder(this)
+                .setTitle("本房间昵称")
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("保存", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        final String nick = ed.getText().toString().trim();
+                        bg(new BgCall() {
+                            public void run() throws Exception { api.setRoomNickname(roomId, nick); }
+                        }, new BgDone() {
+                            public void onDone(String e) {
+                                errToast(e);
+                                if (e == null) { toast("已更新"); loadMessages(false); }
+                            }
+                        });
+                    }
+                })
+                .show();
+    }
+
+    private void confirmDissolve() {
+        new AlertDialog.Builder(this)
+                .setTitle("解散房间")
+                .setMessage("解散后仅保留历史消息，不可恢复。确定解散吗？")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("解散", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        bg(new BgCall() {
+                            public void run() throws Exception { api.dissolveRoom(roomId); }
+                        }, new BgDone() {
+                            public void onDone(String e) {
+                                if (e != null) { toast("解散失败：" + e); return; }
+                                toast("已解散");
+                                loadRooms();
+                                loadMessages(true);
+                            }
+                        });
+                    }
+                })
+                .show();
+    }
+
     /* ---------------- 我的 ---------------- */
 
     private void showMe() {
         String nick = api.user.nickname.length() > 0 ? api.user.nickname : "";
-        String[] items = {"修改昵称" + (nick.length() > 0 ? "（" + nick + "）" : ""), "退出登录"};
+        final String[] items = {
+                "修改昵称" + (nick.length() > 0 ? "（" + nick + "）" : ""),
+                "更换头像",
+                "🔑 激活最高权限",
+                "📜 历史更新记录 / 公告",
+                "在线人数 / 服务器",
+                "退出登录",
+                "注销账号（不可恢复）"
+        };
         new AlertDialog.Builder(this)
+                .setTitle("我的")
                 .setItems(items, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface d, int which) {
-                        if (which == 0) editNick();
-                        else confirmLogout();
+                        switch (which) {
+                            case 0: editNick(); break;
+                            case 1: avatarDialog(); break;
+                            case 2: permDialog(); break;
+                            case 3: showChangelog(); break;
+                            case 4: showServerInfo(); break;
+                            case 5: confirmLogout(); break;
+                            case 6: confirmDeleteAccount(); break;
+                        }
                     }
                 })
                 .setNegativeButton("取消", null)
+                .show();
+    }
+
+    /* ---------------- 头像 ---------------- */
+
+    private static final int REQ_PICK_AVATAR = 2002;
+    private Uri pendingAvatarUri;
+
+    private void avatarDialog() {
+        final String[] acts = api.user.avatar.length() > 0
+                ? new String[]{"从相册选择新头像", "恢复默认头像"}
+                : new String[]{"从相册选择新头像"};
+        new AlertDialog.Builder(this)
+                .setTitle("头像")
+                .setItems(acts, new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int which) {
+                        if (which == 0) {
+                            Intent i = new Intent(Intent.ACTION_GET_CONTENT);
+                            i.setType("image/*");
+                            i.addCategory(Intent.CATEGORY_OPENABLE);
+                            try {
+                                startActivityForResult(Intent.createChooser(i, "选择头像"), REQ_PICK_AVATAR);
+                            } catch (Exception e) { toast("没有可用的图片选择器"); }
+                        } else {
+                            bg(new BgCall() {
+                                public void run() throws Exception { api.clearAvatar(); }
+                            }, new BgDone() {
+                                public void onDone(String e) {
+                                    errToast(e);
+                                    if (e == null) toast("已恢复默认头像");
+                                }
+                            });
+                        }
+                    }
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void uploadAvatar(final Uri uri) {
+        final String name = displayName(uri);
+        String mime = "image/jpeg";
+        String low = name.toLowerCase();
+        if (low.endsWith(".png")) mime = "image/png";
+        else if (low.endsWith(".gif")) mime = "image/gif";
+        else if (low.endsWith(".webp")) mime = "image/webp";
+        final String finalMime = mime;
+        bg(new BgCall() {
+            public void run() throws Exception {
+                File tmp = new File(getCacheDir(), "avatar_" + System.currentTimeMillis());
+                InputStream is = getContentResolver().openInputStream(uri);
+                if (is == null) throw new Exception("无法读取图片");
+                OutputStream os = new FileOutputStream(tmp);
+                byte[] buf = new byte[16384];
+                int n;
+                while ((n = is.read(buf)) > 0) os.write(buf, 0, n);
+                os.close(); is.close();
+                try { api.setAvatar(tmp, finalMime); }
+                finally { tmp.delete(); }
+            }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("上传失败：" + e); return; }
+                toast("头像已更新");
+            }
+        });
+    }
+
+    /* ---------------- 最高权限 ---------------- */
+
+    private void permDialog() {
+        final EditText ed = new EditText(this);
+        ed.setHint("权限密钥");
+        ed.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        new AlertDialog.Builder(this)
+                .setTitle("激活最高权限")
+                .setMessage("输入权限密钥后可管理全部房间与用户。")
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("激活", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        final String key = ed.getText().toString().trim();
+                        if (key.length() == 0) return;
+                        bg(new BgCall() {
+                            public void run() throws Exception { api.activatePerm(key); }
+                        }, new BgDone() {
+                            public void onDone(String e) {
+                                if (e != null) { toast("激活失败：" + e); return; }
+                                toast("最高权限已激活");
+                            }
+                        });
+                    }
+                })
+                .show();
+    }
+
+    /* ---------------- 版本 / 公告 ---------------- */
+
+    private void showChangelog() {
+        bg(new BgCall() {
+            public void run() throws Exception { versionInfo = api.version(); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                if (e != null) { toast("获取失败：" + e); return; }
+                StringBuilder sb = new StringBuilder();
+                org.json.JSONObject v = versionInfo.optJSONObject("version");
+                if (v != null) sb.append("当前版本：v").append(v.optString("name")).append("（").append(v.optInt("code")).append("）\n\n");
+                String ann = versionInfo.optString("announcement", "");
+                if (ann != null && ann.trim().length() > 0) sb.append("【公告】").append(ann).append("\n\n");
+                org.json.JSONObject log = versionInfo.optJSONObject("changelog");
+                if (log != null) {
+                    org.json.JSONArray rels = log.optJSONArray("releases");
+                    if (rels != null) {
+                        int n = Math.min(6, rels.length());
+                        for (int i = 0; i < n; i++) {
+                            org.json.JSONObject r = rels.optJSONObject(i);
+                            if (r == null) continue;
+                            sb.append("v").append(r.optString("version")).append("\n");
+                            org.json.JSONArray ch = r.optJSONArray("changes");
+                            if (ch != null) {
+                                for (int k = 0; k < ch.length(); k++) sb.append(" · ").append(ch.optString(k)).append("\n");
+                            }
+                            sb.append("\n");
+                        }
+                    }
+                }
+                if (sb.length() == 0) sb.append("暂无更新记录");
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("更新记录 / 公告")
+                        .setMessage(sb.toString())
+                        .setPositiveButton("关闭", null)
+                        .show();
+            }
+        });
+    }
+
+    private org.json.JSONObject versionInfo;
+
+    private void showServerInfo() {
+        bg(new BgCall() {
+            public void run() throws Exception { onlineNow = api.onlineCount(); }
+        }, new BgDone() {
+            public void onDone(String e) {
+                String s = "服务器：" + api.base() + "\n公共聊天室在线：" + (e == null ? String.valueOf(onlineNow) : "获取失败");
+                new AlertDialog.Builder(MainActivity.this)
+                        .setTitle("在线人数 / 服务器")
+                        .setMessage(s)
+                        .setPositiveButton("关闭", null)
+                        .show();
+            }
+        });
+    }
+
+    private int onlineNow = 0;
+
+    /* ---------------- 注销账号 ---------------- */
+
+    private void confirmDeleteAccount() {
+        final EditText ed = new EditText(this);
+        ed.setHint("请输入你的账号名：" + api.user.username);
+        new AlertDialog.Builder(this)
+                .setTitle("注销账号")
+                .setMessage("账号、消息、文件、好友关系将被永久删除，不可恢复。请输入账号名确认。")
+                .setView(ed)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("确认注销", new DialogInterface.OnClickListener() {
+                    public void onClick(DialogInterface d, int w) {
+                        if (!api.user.username.equals(ed.getText().toString().trim())) {
+                            toast("账号名不符，已取消");
+                            return;
+                        }
+                        bg(new BgCall() {
+                            public void run() throws Exception { api.deleteAccount(); }
+                        }, new BgDone() {
+                            public void onDone(String e) {
+                                if (e != null) { toast("注销失败：" + e); return; }
+                                store.setToken("");
+                                store.forget(api.user.username);
+                                toast("账号已注销");
+                                gotoLogin();
+                            }
+                        });
+                    }
+                })
                 .show();
     }
 
