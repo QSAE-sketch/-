@@ -406,8 +406,14 @@
   function renderSkinList() {
     var box = $('skinList');
     if (!box) return;
-    if (!S.skins.length) { box.innerHTML = '<div class="empty">还没有皮肤</div>'; return; }
-    var h = '';
+    var h = '<div class="skin-card' + (S.skin ? '' : ' on') + '">' +
+      '<div class="skin-pv"><span class="skin-pv-ph">默</span></div>' +
+      '<div class="skin-meta">' +
+      '<div class="r-title">默认外观' + (S.skin ? '' : '<span class="badge">使用中</span>') + '</div>' +
+      '<div class="r-sub">轻聊原始样式 · 不套用任何皮肤</div>' +
+      '<div class="skin-acts">' +
+      (S.skin ? '<span class="mini-btn" data-skin-use="">恢复默认</span>' : '') +
+      '</div></div></div>';
     for (var i = 0; i < S.skins.length; i++) {
       var s = S.skins[i];
       var active = S.skin === s.id;
@@ -434,8 +440,9 @@
     var uses = box.querySelectorAll('[data-skin-use]');
     for (var u = 0; u < uses.length; u++) {
       uses[u].onclick = function () {
-        skinApply(this.getAttribute('data-skin-use'));
-        toast('已切换到「' + (skinFind(S.skin) || {}).name + '」');
+        var id = this.getAttribute('data-skin-use') || '';
+        skinApply(id);
+        toast(id ? ('已切换到「' + ((skinFind(id) || {}).name || id) + '」') : '已恢复默认外观');
         renderSkinList();
       };
     }
@@ -809,6 +816,29 @@
     if (cancel) cancel.className = 'btn ghost';
     themeModalPanel = null;
     themeModalOpen = false;
+  }
+
+  /* ---------------- 应用内确认 / 输入弹层 ----------------
+   * 手机 WebView 与部分浏览器会屏蔽 window.confirm/prompt，
+   * 点了直接没反应。所有需要确认、输入的地方统一走这里。
+   * 回调返回 false 可保持弹层不关闭（用于校验失败）。
+   */
+  var askSeq = 0;
+  function askConfirm(title, text, onOk, okText) {
+    openModal(title, '<div class="ask-text">' + text + '</div>', onOk, okText || '确定');
+  }
+  function askInput(title, text, value, onOk, okText) {
+    var id = 'askInput_' + (++askSeq);
+    var h = '<div class="ask-text">' + text + '</div>' +
+      '<input class="ask-field" id="' + id + '" type="text" value="' + esc(value || '') + '">';
+    openModal(title, h, function () {
+      var f = $(id);
+      return onOk(f ? f.value : '');
+    }, okText || '确定');
+    setTimeout(function () {
+      var f = $(id);
+      if (f && f.focus) { f.focus(); if (f.select) f.select(); }
+    }, 30);
   }
   $('modalCancel').onclick = closeModal;
   $('modalOk').onclick = function () {
@@ -1696,14 +1726,15 @@
     if (S.user.avatar) {
       var reset = el('div', 'me-av-reset', '恢复默认头像');
       reset.onclick = function () {
-        if (!window.confirm('恢复为默认的色块头像吗？')) return;
-        api('DELETE', '/api/me/avatar', null, function (err, d) {
+        askConfirm('恢复默认头像', '恢复为默认的色块头像吗？', function () {
+          api('DELETE', '/api/me/avatar', null, function (err, d) {
           if (err) { toast(err.message); return; }
           S.user = d.user;
-          renderMe();
-          refreshUserBar();
-          toast('已恢复默认头像');
-        });
+            renderMe();
+            refreshUserBar();
+            toast('已恢复默认头像');
+          });
+        }, '恢复');
       };
       box.appendChild(reset);
     }
@@ -1767,32 +1798,34 @@
 
   function doChangeNickname() {
     if (!S.user) return;
-    var v = window.prompt('修改昵称（2-20 位中英文 / 数字 / 下划线）：', S.user.nickname || '');
-    if (v === null) return;
-    v = String(v).trim();
-    if (!v) return;
-    api('POST', '/api/me/nickname', { nickname: v }, function (err, d) {
-      if (err) { alert('修改失败：' + (err.message || err)); return; }
-      S.user = d.user;
-      renderMe();
-      refreshUserBar();
-      alert('昵称已更新');
-    });
+    askInput('修改昵称', '2-20 位中英文 / 数字 / 下划线', S.user.nickname || '', function (v) {
+      v = String(v).trim();
+      if (!v) { toast('昵称不能为空'); return false; }
+      api('POST', '/api/me/nickname', { nickname: v }, function (err, d) {
+        if (err) { toast('修改失败：' + (err.message || err)); return; }
+        S.user = d.user;
+        renderMe();
+        refreshUserBar();
+        toast('昵称已更新');
+      });
+    }, '保存');
   }
 
   function doDeleteAccount() {
     if (!S.user) return;
-    if (!window.confirm('注销后你的账号、创建的群、发布的消息和文件将被永久删除，且不可恢复。\n\n确定要注销吗？')) return;
-    var input = window.prompt('请输入你的账号名「' + S.user.username + '」以确认注销：');
-    if (input === null) return;
-    if (input.trim() !== S.user.username) { alert('账号名不符，已取消注销'); return; }
-    api('POST', '/api/account/delete', { confirm: true }, function (err, d) {
-      if (err) { alert('注销失败：' + (err.message || err)); return; }
-      localStorage.removeItem('ll_token');
-      S.user = null;
-      alert('账号已注销');
-      location.reload();
-    });
+    var expect = S.user.username;
+    askInput('注销账号',
+      '注销后你的账号、创建的群、发布的消息和文件将被永久删除，且不可恢复。<br>请输入账号名「' +
+      esc(expect) + '」以确认注销：', '', function (v) {
+        if (String(v).trim() !== expect) { toast('账号名不符，已取消注销'); return false; }
+        api('POST', '/api/account/delete', { confirm: true }, function (err) {
+          if (err) { toast('注销失败：' + (err.message || err)); return; }
+          localStorage.removeItem('ll_token');
+          S.user = null;
+          toast('账号已注销');
+          location.reload();
+        });
+      }, '确认注销');
   }
 
   /* ---------------- 视图：设置 ---------------- */
@@ -3296,17 +3329,18 @@
     closeModal();
     var roomId = S.room.id;
     if (!roomId) return;
-    if (!window.confirm('将「' + name + '」设为该群的遗产继承人？\n你注销账号时，群主自动转交给 TA（不影响当前管理）。\n若 TA 已是继承人，再次点击则取消。')) return;
+    askConfirm('遗产继承人', '将「' + name + '」设为该群的遗产继承人？<br>你注销账号时，群主自动转交给 TA（不影响当前管理）。<br>若 TA 已是继承人，再次点击则取消。', function () {
     api('GET', '/api/rooms/' + roomId + '/members', {}, function (err, d) {
       if (err) { alert('获取成员失败：' + (err.message || err)); return; }
       var cur = (d && d.heirId) || null;
       var newHeir = (cur === uid) ? '' : uid;
       api('POST', '/api/rooms/' + roomId + '/heir', { heirId: newHeir }, function (err2, d2) {
         if (err2) { alert('设置失败：' + (err2.message || err2)); return; }
-        alert(d2.heirId ? ('已将「' + name + '」设为遗产继承人') : '已取消遗产继承人');
+        toast(d2.heirId ? ('已将「' + name + '」设为遗产继承人') : '已取消遗产继承人');
         openMembers();
       });
     });
+    }, '确定');
   }
 
   /* ---------------- 房间专属昵称 / 转让 / 解散 ---------------- */
@@ -3316,26 +3350,27 @@
     if (!S.room) return;
     closeModal();
     var roomId = S.room.id;
-    var v = window.prompt('本房间昵称（2-20 位中英文/数字/下划线；留空恢复全局昵称）：', '');
-    if (v === null) return;
-    api('POST', '/api/rooms/' + roomId + '/nickname', { nickname: String(v).trim() }, function (err, d) {
-      if (err) { alert('修改失败：' + (err.message || err)); return; }
-      alert('本房间昵称已更新为「' + d.displayName + '」\n其它房间与全局昵称不受影响');
-      openMembers();
-    });
+    askInput('本房间昵称', '2-20 位中英文/数字/下划线；留空恢复全局昵称', '', function (v) {
+      api('POST', '/api/rooms/' + roomId + '/nickname', { nickname: String(v).trim() }, function (err, d) {
+        if (err) { toast('修改失败：' + (err.message || err)); return; }
+        toast('本房间昵称已更新为「' + d.displayName + '」');
+        openMembers();
+      });
+    }, '保存');
   }
 
   /** 主动转让群主：二次确认，服务端会在该房间发布系统通知 */
   function doTransferOwner(uid, name) {
     if (!S.room) return;
     closeModal();
-    if (!window.confirm('确定把群主权限转让给「' + name + '」吗？\n转让后你将变为普通成员，并会在本群发布一条系统通知。')) return;
-    var roomId = S.room.id;
-    api('POST', '/api/rooms/' + roomId + '/transfer', { userId: uid, confirm: true }, function (err) {
-      if (err) { alert('转让失败：' + (err.message || err)); return; }
-      alert('群主权限已转让');
-      refreshRoomAfterChange();
-    });
+    askConfirm('转让群主', '确定把群主权限转让给「' + name + '」吗？<br>转让后你将变为普通成员，并会在本群发布一条系统通知。', function () {
+      var roomId = S.room.id;
+      api('POST', '/api/rooms/' + roomId + '/transfer', { userId: uid, confirm: true }, function (err) {
+        if (err) { toast('转让失败：' + (err.message || err)); return; }
+        toast('群主权限已转让');
+        refreshRoomAfterChange();
+      });
+    }, '转让');
   }
 
   /** 解散群聊：仅群主可见，两步确认；停用后成员仍能读到解散系统通知 */
@@ -3345,17 +3380,17 @@
     var name = roomNameById(roomId);
     var isPublic = S.room.kind === 'public' || S.room.publicHall;
     closeModal();
-    if (!window.confirm((isPublic
-      ? '这是公共大厅，解散后全体成员都将只能查看历史消息，且不可恢复。\n\n确定解散吗？'
-      : '解散后「' + name + '」将停用，仅保留历史消息与解散通知，且不可恢复。\n\n确定解散吗？'))) return;
-    var typed = window.prompt('请输入房间名「' + name + '」以确认解散：');
-    if (typed === null) return;
-    if (String(typed).trim() !== name) { alert('房间名不符，已取消解散'); return; }
-    api('POST', '/api/rooms/' + roomId + '/dissolve', { confirm: true }, function (err) {
-      if (err) { alert('解散失败：' + (err.message || err)); return; }
-      alert('已解散。成员仍可进入查看历史消息与解散通知');
-      refreshRoomAfterChange();
-    });
+    var tip = (isPublic
+      ? '这是公共大厅，解散后全体成员都将只能查看历史消息，且不可恢复。'
+      : '解散后「' + name + '」将停用，仅保留历史消息与解散通知，且不可恢复。');
+    askInput('解散群聊', tip + '<br>请输入房间名「' + esc(name) + '」以确认解散：', '', function (typed) {
+      if (String(typed).trim() !== name) { toast('房间名不符，已取消解散'); return false; }
+      api('POST', '/api/rooms/' + roomId + '/dissolve', { confirm: true }, function (err) {
+        if (err) { toast('解散失败：' + (err.message || err)); return; }
+        toast('已解散。成员仍可进入查看历史消息与解散通知');
+        refreshRoomAfterChange();
+      });
+    }, '解散');
   }
 
   /** 最高权限：清空本房间全部消息（房间本身保留，不产生解散通知） */
@@ -3364,16 +3399,15 @@
     var roomId = S.room.id;
     var name = roomNameById(roomId);
     closeModal();
-    if (!window.confirm('将彻底清空「' + name + '」的全部消息（含文件字节），房间本身保留。\n此操作不可恢复，确定继续吗？')) return;
-    var typed = window.prompt('请输入「' + name + '」以确认清空：');
-    if (typed === null) return;
-    if (String(typed).trim() !== name) { alert('房间名不符，已取消'); return; }
-    api('POST', '/api/admin/rooms/' + roomId + '/clear', { confirm: true }, function (err, d) {
-      if (err) { alert('清空失败：' + (err.message || err)); return; }
-      alert('已清空 ' + (d && d.cleared ? d.cleared : 0) + ' 条消息');
-      pullNow(true);
-      refreshRoomAfterChange();
-    });
+    askInput('清空消息', '将彻底清空「' + esc(name) + '」的全部消息（含文件字节），房间本身保留。<br>此操作不可恢复。请输入「' + esc(name) + '」确认：', '', function (typed) {
+      if (String(typed).trim() !== name) { toast('房间名不符，已取消'); return false; }
+      api('POST', '/api/admin/rooms/' + roomId + '/clear', { confirm: true }, function (err, d) {
+        if (err) { toast('清空失败：' + (err.message || err)); return; }
+        toast('已清空 ' + (d && d.cleared ? d.cleared : 0) + ' 条消息');
+        pullNow(true);
+        refreshRoomAfterChange();
+      });
+    }, '清空');
   }
 
   /** 房间状态变化后重新拉一遍：拿到系统通知，并同步只读状态 */
@@ -3516,19 +3550,19 @@
   function doAdminDeleteUser(u) {
     if (!u) return;
     var name = u.nickname || u.username;
-    if (!window.confirm('确定注销用户「' + name + '」吗？\n' +
-      '其创建的房间、发布的全部消息与上传的文件都会被彻底清除，不可恢复。')) return;
-    var typed = window.prompt('请输入该用户的账号名「' + u.username + '」以确认注销：');
-    if (typed === null) return;
-    if (String(typed).trim() !== u.username) { alert('账号名不符，已取消'); return; }
-    api('POST', '/api/admin/users/' + encodeURIComponent(u.id) + '/delete', { confirm: true }, function (err, d) {
-      if (err) { alert('注销失败：' + (err.message || err)); return; }
-      var st = (d && d.stats) || {};
-      alert('已注销。清理：房间 ' + (st.rooms || 0) + ' 个 / 消息 ' + (st.messages || 0) +
-        ' 条 / 文件 ' + (st.files || 0) + ' 个');
-      closeProfile();
-      loadRooms();
-    });
+    askInput('注销用户', '确定注销用户「' + esc(name) + '」吗？<br>' +
+      '其创建的房间、发布的全部消息与上传的文件都会被彻底清除，不可恢复。<br>' +
+      '请输入该用户的账号名「' + esc(u.username) + '」以确认：', '', function (typed) {
+        if (String(typed).trim() !== u.username) { toast('账号名不符，已取消'); return false; }
+        api('POST', '/api/admin/users/' + encodeURIComponent(u.id) + '/delete', { confirm: true }, function (err, d) {
+          if (err) { toast('注销失败：' + (err.message || err)); return; }
+          var st = (d && d.stats) || {};
+          toast('已注销。清理：房间 ' + (st.rooms || 0) + ' 个 / 消息 ' + (st.messages || 0) +
+            ' 条 / 文件 ' + (st.files || 0) + ' 个');
+          closeProfile();
+          loadRooms();
+        });
+      }, '注销');
   }
 
   function renderProfile() {
@@ -4100,35 +4134,36 @@
   }
 
   function doDriveRename(it) {
-    var name = window.prompt('新的文件名：', it.name || '');
-    if (name === null) return;
-    name = String(name).trim();
-    if (!name) { toast('文件名不能为空'); return; }
-    api('PATCH', '/api/drive/files/' + it.fileId, { name: name }, function (err) {
-      if (err) { toast(err.message); return; }
-      toast('已重命名');
-      loadDrive();
-    });
+    askInput('重命名', '新的文件名：', it.name || '', function (name) {
+      name = String(name).trim();
+      if (!name) { toast('文件名不能为空'); return false; }
+      api('PATCH', '/api/drive/files/' + it.fileId, { name: name }, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('已重命名');
+        loadDrive();
+      });
+    }, '保存');
   }
 
   function doDriveMove(it) {
-    var folder = window.prompt('移动到哪个目录？（留空 = 移到根目录）', it.folder || '');
-    if (folder === null) return;
-    api('PATCH', '/api/drive/files/' + it.fileId, { folder: String(folder) }, function (err) {
-      if (err) { toast(err.message); return; }
-      toast('已移动');
-      loadDrive();
-    });
+    askInput('移动文件', '移动到哪个目录？（留空 = 移到根目录）', it.folder || '', function (folder) {
+      api('PATCH', '/api/drive/files/' + it.fileId, { folder: String(folder) }, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('已移动');
+        loadDrive();
+      });
+    }, '移动');
   }
 
   function doDriveDelete(it) {
-    if (!window.confirm('将「' + (it.name || '') + '」移入回收站？\n\n30 天内可以恢复，之后自动彻底删除。')) return;
-    api('DELETE', '/api/drive/files/' + it.fileId, null, function (err) {
-      if (err) { toast(err.message); return; }
-      toast('已移入回收站');
-      loadDrive();
-      loadDriveStorage();
-    });
+    askConfirm('移入回收站', '将「' + esc(it.name || '') + '」移入回收站？<br>30 天内可以恢复，之后自动彻底删除。', function () {
+      api('DELETE', '/api/drive/files/' + it.fileId, null, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('已移入回收站');
+        loadDrive();
+        loadDriveStorage();
+      });
+    }, '删除');
   }
 
   function doDriveRestore(id) {
@@ -4141,13 +4176,14 @@
   }
 
   function doDrivePurge(id) {
-    if (!window.confirm('彻底删除后不可恢复，确定吗？')) return;
-    api('DELETE', '/api/drive/trash/' + id, null, function (err) {
-      if (err) { toast(err.message); return; }
-      toast('已彻底删除，空间已释放');
-      loadDrive();
-      loadDriveStorage();
-    });
+    askConfirm('彻底删除', '彻底删除后不可恢复，确定吗？', function () {
+      api('DELETE', '/api/drive/trash/' + id, null, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('已彻底删除，空间已释放');
+        loadDrive();
+        loadDriveStorage();
+      });
+    }, '彻底删除');
   }
 
   /* ---------------- 分享 ---------------- */

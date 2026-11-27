@@ -957,3 +957,12 @@ footer { color: var(--fg-3); }
 }
 .skin-help code { background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
 .skin-help .dim { color: var(--fg-4); font-size: 12px; }
+
+/* 应用内确认 / 输入弹层：替代被手机 WebView 屏蔽的 confirm/prompt */
+.ask-text { line-height: 1.75; color: var(--fg-2); padding: 2px 0 10px; word-break: break-word; }
+.ask-field {
+  width: 100%; box-sizing: border-box; padding: 10px 12px; font-size: 15px;
+  border: 1px solid var(--border-3); border-radius: 8px;
+  background: var(--surface-2); color: var(--fg); outline: none;
+}
+.ask-field:focus { border-color: var(--accent); }

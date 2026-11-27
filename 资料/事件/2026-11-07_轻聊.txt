@@ -194,3 +194,8 @@ Git：chatapp/ 本地仓库（main），提交 934177c（2.1.0 基线 184 文件
     test/skins.js 加断言（14 套、12 个 ID、每套深浅配色不同 + 风格样式）
   - tools/shot-skins-all.js 用 CDP 逐套读实际计算样式：12/12 浅深不同、标题栏非纯黑、圆角各异
   - 本地/云端各 797/0；线上 version=2.7.0、12 套 CSS 全 200；已发布
+
+· 2026-11-27 线上修复（2.7.1/code32）：
+  - 皮肤中心加「默认外观」卡片（data-skin-use="" → skinApply('')），可一键切回原始样式
+  - 全部 window.confirm/prompt 换成应用内 askConfirm/askInput 弹层（手机 WebView 屏蔽原生弹窗导致注销/网盘操作点了没反应）；覆盖注销账号、最高权限注销、改昵称、头像恢复、遗产继承人、房间昵称/转让/解散/清空、网盘重命名/移动/删除/彻底删除
+  - alert 同步改 toast；新增 tools/verify-interactions.js（CDP 端到端 9/9）；本地/云端各 797/0；线上 2.7.1 版本号核验通过；已发布
