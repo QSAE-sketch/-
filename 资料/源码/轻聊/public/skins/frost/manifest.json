@@ -1,0 +1,11 @@
+{
+  "id": "frost",
+  "name": "霜色 Frost",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "晨霜的冷白蓝，极简；大量留白 + 极细描边",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "minimal",
+  "tone": "airy"
+}

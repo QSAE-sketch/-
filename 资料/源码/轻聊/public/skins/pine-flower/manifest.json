@@ -1,0 +1,11 @@
+{
+  "id": "pine-flower",
+  "name": "松花 PineFlower",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "松花粉的金黄，复古印刷；衬线 + 旧纸暖调",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "vintage",
+  "tone": "mid"
+}

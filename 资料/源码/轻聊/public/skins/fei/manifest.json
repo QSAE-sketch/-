@@ -1,0 +1,11 @@
+{
+  "id": "fei",
+  "name": "妃色 Fei",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "妃色的正红，粗边硬朗；粗边框 + 硬阴影",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "brutal",
+  "tone": "vivid"
+}

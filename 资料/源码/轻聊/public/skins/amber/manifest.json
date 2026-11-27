@@ -1,0 +1,11 @@
+{
+  "id": "amber",
+  "name": "琥珀 Amber",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "蜜蜡琥珀的暖黄，旧纸底配深褐字；衬线 + 旧纸暖调",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "vintage",
+  "tone": "vivid"
+}

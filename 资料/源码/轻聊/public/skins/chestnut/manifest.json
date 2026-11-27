@@ -1,0 +1,11 @@
+{
+  "id": "chestnut",
+  "name": "栗棕 Chestnut",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "糖炒栗子的棕，旧纸质感；衬线 + 旧纸暖调",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "vintage",
+  "tone": "deep"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "clay",
+  "name": "陶土 Clay",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "陶土的暖棕，粗边手工感；粗边框 + 硬阴影",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "brutal",
+  "tone": "soft"
+}

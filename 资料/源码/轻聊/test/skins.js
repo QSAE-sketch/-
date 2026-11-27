@@ -131,6 +131,39 @@ function makeZip(files) {
   }
   check('12 套皮肤顶栏/预览标题条文字对比度均≥4.5', contrastOk === 12, contrastBad);
 
+  // 1d. 扩展皮肤（43 套）：总数 50+、每套有 style/tone 元数据、深浅配色齐、对比度达标
+  const EXT_SKIN_IDS = ['rouge','indigo','amber','bamboo','lotus','crow','maple','silk','denim',
+    'pine-soot','sandal','lilac','bamboo-moon','dai-blue','autumn','fei','azurite','tea','scallion',
+    'moon-white','coral','wisteria','pine-flower','celadon','crimson','pale-blue','ginger','forest',
+    'peach','sky-cyan','chestnut','rosewood','scallion-2','navy','honey','smoke','madder','spring',
+    'guihua','frost','plum','jasper','clay'];
+  check('内置皮肤总数≥55 套', builtins.length >= 55, builtins.length);
+  check('43 套扩展皮肤全在列表里', EXT_SKIN_IDS.every((id) => builtins.some((s) => s.id === id)),
+    EXT_SKIN_IDS.filter((id) => !builtins.some((s) => s.id === id)));
+  check('扩展皮肤带 style/tone 风格元数据', EXT_SKIN_IDS.every((id) => {
+    const s = builtins.find((b) => b.id === id); return s && s.style && s.tone;
+  }), 'meta');
+  let extOk = 0;
+  for (const id of EXT_SKIN_IDS) {
+    const css = readSkinCss(id);
+    const pv = fs.readFileSync(path.join(__dirname, '..', 'public', 'skins', id, 'preview.svg'), 'utf8');
+    const split = css.indexOf('data-theme="dark"');
+    const segs = [css.slice(0, split), css.slice(split)];
+    const bars = pv.match(/<rect[^>]*height="30"[^>]*fill="([^"]+)"/g) || [];
+    const texts = pv.match(/<text[^>]*fill="([^"]+)"/g) || [];
+    let ok = true;
+    for (let s = 0; s < 2; s++) {
+      const tbg = (segs[s].match(/--topbar-bg:\s*(#[0-9a-f]{6})/i) || [])[1];
+      const tfg = (segs[s].match(/--topbar-fg:\s*(#[0-9a-f]{6})/i) || [])[1];
+      if (!tbg || !tfg || wcag(tbg, tfg) < 4.5) { ok = false; break; }
+      const bar = (bars[s] || '').match(/fill="(#[0-9a-f]{6})"/i);
+      const fill = (texts[s] || '').match(/fill="(#[0-9a-f]{6})"/i);
+      if (!bar || !fill || wcag(bar[1], fill[1]) < 4.5) { ok = false; break; }
+    }
+    if (ok) extOk++;
+  }
+  check('43 套扩展皮肤顶栏/预览对比度均≥4.5', extOk === 43, extOk);
+
   // 1b. 直接上传一份 CSS 就能做皮肤（自动生成 manifest 和预览图）
   const cssText = ':root{--bg:#abcdef}\n:root[data-theme="dark"]{--bg:#101010}';
   r = await req('POST', '/api/skins', null, ta, Buffer.from(cssText, 'utf8'),

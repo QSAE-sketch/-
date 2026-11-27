@@ -1,0 +1,11 @@
+{
+  "id": "smoke",
+  "name": "烟灰 Smoke",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "淡烟的灰紫，极简低饱和；大量留白 + 极细描边",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "minimal",
+  "tone": "soft"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "moon-white",
+  "name": "月白 MoonWhite",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "月白瓷的青白，极简通透；大量留白 + 极细描边",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "minimal",
+  "tone": "airy"
+}

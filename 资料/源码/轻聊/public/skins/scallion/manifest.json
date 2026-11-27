@@ -1,0 +1,11 @@
+{
+  "id": "scallion",
+  "name": "葱绿 Scallion",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "小葱的鲜绿，干净色块；无衬线 + 纯色块",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "swiss",
+  "tone": "vivid"
+}

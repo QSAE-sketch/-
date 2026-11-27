@@ -115,6 +115,7 @@ function publicSkin(s, user) {
   return {
     id: s.id, name: s.name, version: s.version, author: s.author,
     description: s.description,
+    style: s.style || '', tone: s.tone || '',
     preview: s.preview
       ? (s.builtin ? '/skins/' + s.id + '/' + s.preview : '/api/skins/' + s.id + '/file/' + encodeURI(s.preview))
       : '',
@@ -160,10 +161,12 @@ function registerSkins(deps) {
     for (const b of builtin) {
       const old = db.get('skins', b.id);
       if (old && old.version === b.version && old.description === b.description &&
-          old.preview === 'preview.svg' && old.entry === b.entry) continue;
+          old.preview === 'preview.svg' && old.entry === b.entry &&
+          old.style === (b.style || '') && old.tone === (b.tone || '')) continue;
       db.put('skins', {
         id: b.id, name: b.name, version: b.version, author: '系统内置',
         description: b.description, entry: b.entry, preview: 'preview.svg',
+        style: b.style || '', tone: b.tone || '',
         isPublic: true, builtin: true, ownerId: '', createdAt: old ? old.createdAt : Date.now(),
         files: b.files
       });

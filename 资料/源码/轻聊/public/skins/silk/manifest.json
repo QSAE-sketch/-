@@ -1,0 +1,11 @@
+{
+  "id": "silk",
+  "name": "缃色 Silk",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "浅黄丝绸的柔光，旧书页气质；衬线 + 旧纸暖调",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "vintage",
+  "tone": "soft"
+}

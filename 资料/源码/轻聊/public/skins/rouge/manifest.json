@@ -1,0 +1,11 @@
+{
+  "id": "rouge",
+  "name": "胭脂 Rouge",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "老式胭脂盒的枣红，衬线标题配细分割线；衬线标题 + 细分割线",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "editorial",
+  "tone": "vivid"
+}

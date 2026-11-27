@@ -1,0 +1,11 @@
+{
+  "id": "forest",
+  "name": "墨绿 Forest",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "深林墨绿，等宽终端；等宽字 + 终端高亮",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "terminal",
+  "tone": "deep"
+}

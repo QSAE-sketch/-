@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+<rect width="320" height="200" fill="#f4f2f1"/>
+<rect x="10" y="10" width="146" height="180" rx="6" fill="#fdfcfc" stroke="#d1ccc7" stroke-width="1"/>
+<rect x="10" y="10" width="146" height="30" rx="6" fill="#996529"/>
+<text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#ffffff">茶褐</text>
+<rect x="20" y="50" width="104" height="16" rx="3" fill="#d1ccc7" opacity=".5"/>
+<rect x="20" y="74" width="112" height="22" rx="6" fill="#fdfcfc" stroke="#d1ccc7"/>
+<rect x="34" y="112" width="98" height="22" rx="6" fill="#eee6dd"/>
+<rect x="166" y="10" width="144" height="180" rx="6" fill="#24211e" stroke="#5f574e" stroke-width="1"/>
+<rect x="166" y="10" width="144" height="30" rx="6" fill="#e7b174"/>
+<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#151515">茶褐</text>
+<rect x="176" y="50" width="102" height="16" rx="3" fill="#5f574e" opacity=".5"/>
+<rect x="176" y="74" width="118" height="22" rx="6" fill="#24211e" stroke="#5f574e"/>
+<rect x="190" y="112" width="106" height="22" rx="6" fill="#674e32"/>
+</svg>

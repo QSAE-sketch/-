@@ -1,0 +1,11 @@
+{
+  "id": "dai-blue",
+  "name": "黛蓝 DaiBlue",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "远山黛蓝，衬线 + 细线分隔；衬线标题 + 细分割线",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "editorial",
+  "tone": "deep"
+}

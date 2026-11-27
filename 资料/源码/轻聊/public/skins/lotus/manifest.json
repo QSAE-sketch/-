@@ -1,0 +1,11 @@
+{
+  "id": "lotus",
+  "name": "藕粉 Lotus",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "藕荷色的淡粉，圆润柔和；大圆角 + 柔和阴影",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "soft",
+  "tone": "airy"
+}

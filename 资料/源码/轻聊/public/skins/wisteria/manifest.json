@@ -1,0 +1,11 @@
+{
+  "id": "wisteria",
+  "name": "藤紫 Wisteria",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "紫藤花的柔紫，衬线优雅；衬线标题 + 细分割线",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "editorial",
+  "tone": "soft"
+}

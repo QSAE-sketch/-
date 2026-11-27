@@ -1,0 +1,11 @@
+{
+  "id": "celadon",
+  "name": "青瓷 Celadon",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "龙泉青瓷的粉青，温润留白；大量留白 + 极细描边",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "minimal",
+  "tone": "soft"
+}

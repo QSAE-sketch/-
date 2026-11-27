@@ -1,0 +1,11 @@
+{
+  "id": "plum",
+  "name": "梅子 Plum",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "梅子酒的紫红，复古暖调；衬线 + 旧纸暖调",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "vintage",
+  "tone": "deep"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "spring",
+  "name": "青阳 SpringGreen",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "春日新绿的明亮，笔记纸；手写体 + 纸张便签",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "notebook",
+  "tone": "mid"
+}

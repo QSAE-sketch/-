@@ -1,0 +1,11 @@
+{
+  "id": "pale-blue",
+  "name": "缥色 PaleBlue",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "缥缈的淡青，轻盈圆润；大圆角 + 柔和阴影",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "soft",
+  "tone": "airy"
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#1f6feb">
+<title>文件分享 · 轻聊</title>
+<script>
+/* 首屏防闪烁：与主站同一套主题判定，避免浅/深闪一下 */
+(function () {
+  function ls(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var mode = ls('ll_theme_mode') || 'system', t = 'light';
+  if (mode === 'manual') t = ls('ll_theme_pref') === 'dark' ? 'dark' : 'light';
+  else if (mode === 'time') {
+    var d = 7, n = 18;
+    try { var raw = JSON.parse(ls('ll_theme_time') || '{}');
+      if (raw && typeof raw.d === 'number') d = raw.d;
+      if (raw && typeof raw.n === 'number') n = raw.n; } catch (e) {}
+    var h = new Date().getHours(); t = (h >= d && h < n) ? 'light' : 'dark';
+  } else {
+    var m = String(location.search || '').match(/[?&]sys=(dark|light)/);
+    if (m) t = m[1];
+    else t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  }
+  try { document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+})();
+</script>
+<link rel="stylesheet" href="/style.css">
+<style>
+/* 分享落地页专用：全部走主题变量，深浅色自适应；只做视觉，无新增功能 */
+body { -webkit-text-size-adjust: 100%; }
+.share-wrap { min-height: 100%; display: -webkit-box; -webkit-box-align: center; -webkit-box-pack: center; padding: 24px 16px; }
+.share-card {
+  width: 100%; max-width: 420px; margin: 0 auto; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 12px 40px var(--shadow);
+}
+.share-hd { padding: 24px 20px 18px; text-align: center; border-bottom: 1px solid var(--border-2); }
+.share-logo { font-size: 19px; font-weight: 700; letter-spacing: 1px; color: var(--accent); }
+.share-logo small { display: block; font-size: 12px; font-weight: 400; letter-spacing: 3px; color: var(--fg-3); margin-top: 3px; }
+.share-bd { padding: 26px 22px 22px; text-align: center; }
+.share-icon { font-size: 54px; line-height: 1; margin-bottom: 14px; }
+.share-name { font-size: 16px; font-weight: 600; color: var(--fg); word-break: break-all; line-height: 1.4; }
+.share-sub { font-size: 12px; color: var(--fg-3); margin-top: 8px; line-height: 1.6; }
+.share-code { margin-top: 18px; text-align: left; }
+.share-code .inp { margin-bottom: 0; }
+.share-act { margin-top: 18px; }
+.share-act .btn { width: 100%; padding: 12px; font-size: 16px; }
+.share-foot { padding: 0 22px 22px; text-align: center; font-size: 12px; color: var(--fg-4); }
+.share-err { color: var(--danger); font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div class="share-wrap">
+  <div class="share-card">
+    <div class="share-hd">
+      <div class="share-logo">轻聊<small>文件分享</small></div>
+    </div>
+    <div class="share-bd">
+      <div class="share-icon" id="icon">📎</div>
+      <div class="share-name" id="name">加载中…</div>
+      <div class="share-sub" id="sub"></div>
+      <div id="err" class="share-err"></div>
+      <div class="share-code hide" id="codeBox">
+        <input id="code" class="inp" type="text" placeholder="请输入提取码" maxlength="12" autocomplete="off">
+      </div>
+      <div class="share-act">
+        <button id="dl" class="btn primary" disabled>下 载</button>
+      </div>
+    </div>
+    <div class="share-foot" id="foot">分享链接来自轻聊</div>
+  </div>
+</div>
+
+<div id="toast" class="toast hide"></div>
+<script src="/share.js"></script>
+</body>
+</html>

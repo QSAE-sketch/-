@@ -1,0 +1,11 @@
+{
+  "id": "sandal",
+  "name": "檀香 Sandal",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "檀香木的褐，笔记纸的暖意；手写体 + 纸张便签",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "notebook",
+  "tone": "soft"
+}

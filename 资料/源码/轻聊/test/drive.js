@@ -312,6 +312,14 @@ function stopServer() {
   check('分享地址形如 /s/xxx', r.json.url === '/s/' + pubShareId, r.json.url);
   check('默认 7 天有效期', r.json.expireAt > Date.now() + 6 * 864e5, r.json.expireAt);
 
+  // 分享落地页路由：此前 /s/xxx 被当静态文件 → 404（重大 bug）
+  r = await req('GET', '/s/' + pubShareId);
+  check('分享页返回 200（不再 404）', r.status === 200, r.status);
+  check('分享页是 share.html', /文件分享/.test(r.raw.toString()) &&
+    /src="\/share\.js/.test(r.raw.toString()), r.raw.toString().slice(0, 120));
+  r = await req('GET', '/s/' + pubShareId + '?sharecode=TESTCODE');
+  check('分享页资源保留 sharecode', /\/share\.js\?sharecode=TESTCODE/.test(r.raw.toString()), r.raw.toString().slice(0, 400));
+
   // 匿名访问（不带 token）
   r = await req('GET', '/api/drive/s/' + pubShareId);
   check('匿名可读公开分享', r.status === 200 && r.json.passed === true, r.json);

@@ -428,8 +428,8 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
   // 「获取验证码」链路（example.com 是 IANA 保留测试域名）
   registry.au.value = 'ql_ui_' + uniq + '@example.com';
   await registry.acode.onclick();
-  // 验证码要经外部邮件服务下发，响应时间抖动较大，等久一点避免误报
-  await wait(6000);
+  // 验证码经外部邮件服务下发，串行套件里抖动较大；轮询等待 toast 出现，最多 20 秒
+  for (let w = 0; w < 40 && registry.toast.textContent.indexOf('验证码') < 0; w++) await wait(500);
   if (errors.length) {
     console.error('❌ 获取验证码时出错');
     errors.forEach((e) => console.error('   ' + e));

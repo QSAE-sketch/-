@@ -1808,7 +1808,8 @@ const BUILTIN_SKINS = fs.readdirSync(path.join(PUBLIC_DIR, 'skins'), { withFileT
       if (!/^[a-z0-9-]+$/.test(mf.id || '') || !fs.existsSync(path.join(dir, mf.entry || 'skin.css'))) return null;
       return { id: mf.id, name: mf.name || mf.id, version: mf.version || '1.0.0',
         author: mf.author || '系统内置', description: mf.description || '',
-        entry: mf.entry || 'skin.css', files };
+        entry: mf.entry || 'skin.css', files,
+        style: mf.style || '', tone: mf.tone || '' };
     } catch (e2) { return null; }
   })
   .filter(Boolean);
@@ -2410,10 +2411,15 @@ function capabilityLevel(req, url) {
 
 function serveStatic(req, res, pathname, url) {
   const isEntry = pathname === '/' || pathname === '/index.html';
+  // 公开分享落地页：/s/<shareId> → share.html。
+  // 此前没有这条路由，serveStatic 把 /s/xxx 当静态文件找 → 404，
+  // 导致分享链接发出去后别人打开直接 404（重大 bug）。
+  const isSharePage = /^\/s\/[A-Za-z0-9_]+\/?$/.test(pathname);
   // 两档分发：老设备(红米 Note 2 等)默认基础版，现代设备标准版；用户可手动切换。
   // 低配版(lite)已删除，只剩 full / basic 两档。
   const level = capabilityLevel(req, url);
-  let rel = isEntry ? (ENTRY_OF_LEVEL[level] || '/index-basic.html') : pathname;
+  let rel = isSharePage ? '/share.html'
+    : (isEntry ? (ENTRY_OF_LEVEL[level] || '/index-basic.html') : pathname);
   rel = rel.replace(/\.\./g, '');
   const file = path.join(PUBLIC_DIR, rel);
   if (!file.startsWith(PUBLIC_DIR)) return fail(res, 403, 'forbidden');
@@ -2467,7 +2473,11 @@ function serveStatic(req, res, pathname, url) {
         if (key !== 'lite') q.push(encodeURIComponent(key) + '=' + encodeURIComponent(val));
       });
       const tail = q.length ? '?' + q.join('&') + '&v=' + v : '?v=' + v;
-      if (rel === '/index-basic.html') {
+      if (rel === '/share.html') {
+        html = html
+          .replace('href="/style.css"', 'href="/style.css' + tail + '"')
+          .replace('src="/share.js"', 'src="/share.js' + tail + '"');
+      } else if (rel === '/index-basic.html') {
         html = html
           .replace('href="/style-basic.css"', 'href="/style-basic.css' + tail + '"')
           .replace('src="/app-basic.js"', 'src="/app-basic.js' + tail + '"');

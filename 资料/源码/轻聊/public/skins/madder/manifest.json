@@ -1,0 +1,11 @@
+{
+  "id": "madder",
+  "name": "茜色 Madder",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "茜草染的暗红，印刷感；衬线标题 + 细分割线",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "editorial",
+  "tone": "mid"
+}

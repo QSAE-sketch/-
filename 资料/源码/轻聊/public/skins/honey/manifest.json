@@ -1,0 +1,11 @@
+{
+  "id": "honey",
+  "name": "蜜橙 Honey",
+  "version": "1.0.0",
+  "author": "系统内置",
+  "description": "蜂蜜的暖橙，圆润柔和；大圆角 + 柔和阴影",
+  "entry": "skin.css",
+  "preview": "preview.svg",
+  "style": "soft",
+  "tone": "vivid"
+}

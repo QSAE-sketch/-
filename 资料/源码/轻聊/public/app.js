@@ -357,6 +357,16 @@
       try { root.removeAttribute('data-skin'); } catch (e2) { }
       if (link && link.parentNode) link.parentNode.removeChild(link);
     }
+    refreshSkinEntry();
+  }
+
+  /** 皮肤切换后同步主页入口文案（避免显示上一个皮肤名） */
+  function refreshSkinEntry() {
+    var sel = document.querySelector || function () { return null; };
+    var el = sel.call(document, '[data-skin-open]');
+    if (!el) return;
+    var name = S.skin ? ((skinFind(S.skin) || {}).name || S.skin) : '';
+    el.textContent = '皮肤中心' + (S.skin ? ' · 当前「' + name + '」' : ' · 当前原版');
   }
 
   /** 从服务器拉皮肤列表；静默失败（皮肤是增强功能，不该拖垮主流程） */
@@ -386,6 +396,9 @@
   function openSkins() {
     var h = '<div class="skin-intro">给界面换一套外观。点「预览」看效果，点「使用」立即切换；' +
       '做自己的皮肤只要一份 CSS 文件，上传即可（也支持 ZIP 完整包）。</div>' +
+      '<div class="skin-search"><input type="text" id="skinSearch" class="inp" ' +
+      'placeholder="🔍 搜索皮肤名 / 风格 / 关键词" autocomplete="off"></div>' +
+      '<div class="r-sub" id="skinCount" style="padding:6px 2px"></div>' +
       '<div class="skin-list" id="skinList">加载中…</div>' +
       '<div class="skin-tools">' +
       '<label class="mini-btn" for="skinUpload">📦 上传皮肤（CSS / ZIP）</label>' +
@@ -394,6 +407,7 @@
       '<div class="r-sub" id="skinUploadTip" style="padding:8px 2px 0"></div>';
     openModal('皮肤中心', h, null, '关闭');
     renderSkinList();
+    $('skinSearch').oninput = function () { renderSkinList(); };
     $('skinUpload').onchange = function () {
       var f = this.files && this.files[0];
       if (!f) return;
@@ -403,19 +417,41 @@
     $('skinHelp').onclick = showSkinHelp;
   }
 
+  /** 皮肤关键词匹配：中文名 / 英文名 / 描述 / 风格 / id */
+  function skinMatch(s, q) {
+    if (!q) return true;
+    q = q.toLowerCase();
+    var hay = [s.name, s.id, s.description, s.author, s.style, s.tone].join(' ').toLowerCase();
+    return hay.indexOf(q) >= 0;
+  }
+
   function renderSkinList() {
     var box = $('skinList');
     if (!box) return;
-    var h = '<div class="skin-card' + (S.skin ? '' : ' on') + '">' +
-      '<div class="skin-pv"><span class="skin-pv-ph">默</span></div>' +
-      '<div class="skin-meta">' +
-      '<div class="r-title">默认外观' + (S.skin ? '' : '<span class="badge">使用中</span>') + '</div>' +
-      '<div class="r-sub">轻聊原始样式 · 不套用任何皮肤</div>' +
-      '<div class="skin-acts">' +
-      (S.skin ? '<span class="mini-btn" data-skin-use="">恢复默认</span>' : '') +
-      '</div></div></div>';
-    for (var i = 0; i < S.skins.length; i++) {
-      var s = S.skins[i];
+    var qEl = $('skinSearch');
+    var q = qEl ? String(qEl.value || '').trim() : '';
+    var list = [];
+    for (var k = 0; k < S.skins.length; k++) if (skinMatch(S.skins[k], q)) list.push(S.skins[k]);
+    var cnt = $('skinCount');
+    if (cnt) cnt.textContent = q
+      ? ('找到 ' + list.length + ' 套皮肤（共 ' + S.skins.length + ' 套）')
+      : ('共 ' + S.skins.length + ' 套皮肤 · 默认外观 + 内置风格 + 你上传的');
+    var h = '';
+    if (!q) {
+      h += '<div class="skin-card' + (S.skin ? '' : ' on') + '">' +
+        '<div class="skin-pv"><span class="skin-pv-ph">默</span></div>' +
+        '<div class="skin-meta">' +
+        '<div class="r-title">默认外观' + (S.skin ? '' : '<span class="badge">使用中</span>') + '</div>' +
+        '<div class="r-sub">轻聊原始样式 · 不套用任何皮肤</div>' +
+        '<div class="skin-acts">' +
+        (S.skin ? '<span class="mini-btn" data-skin-use="">恢复默认</span>' : '') +
+        '</div></div></div>';
+    }
+    if (!list.length) {
+      h += '<div class="empty">没有匹配的皮肤，换个关键词试试</div>';
+    }
+    for (var i = 0; i < list.length; i++) {
+      var s = list[i];
       var active = S.skin === s.id;
       h += '<div class="skin-card' + (active ? ' on' : '') + '">' +
         '<div class="skin-pv">' +
