@@ -1035,7 +1035,7 @@ route('POST', '/api/reports', async (req, res, ctx) => {
 /** 提交反馈：type = bug(问题反馈) / idea(功能建议) */
 route('POST', '/api/feedback', async (req, res, ctx) => {
   const b = await readJson(req);
-  const type = ['bug', 'idea'].indexOf(b.type) !== -1 ? b.type : 'bug';
+  const type = ['bug', 'idea', 'complaint'].indexOf(b.type) !== -1 ? b.type : 'bug';
   const title = String(b.title || '').trim();
   const content = String(b.content || '').trim();
   if (!title) return fail(res, 400, '请填写标题');
@@ -1048,8 +1048,8 @@ route('POST', '/api/feedback', async (req, res, ctx) => {
     userId: ctx.user.id,
     title,
     content,
-    refId: null,
-    refKind: null,
+    refId: b.refId || null,
+    refKind: b.refKind || null,
     status: 'open',
     reply: null,
     createdAt: now()

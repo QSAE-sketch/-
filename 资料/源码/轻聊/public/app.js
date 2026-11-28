@@ -1790,6 +1790,7 @@
       '· 删除 = 仅对自己隐藏；撤回 = 发送者 2 分钟内，彻底移除<br>' +
       '· 直接删除 = 无时间限制，服务器端彻底清除，所有设备同步消失</div></div>';
     h += '<div class="card"><div class="act" id="viewChangelog">📜 历史更新记录 · 查看每个版本新增与修复</div></div>';
+    h += '<div class="card"><div class="act" id="openFeedback">📮 反馈箱 · 提交问题 / 建议 / 举报</div></div>';
     h += '<div class="card"><div class="card-h">开发者联系方式</div>' +
       '<div class="r-sub" style="padding:11px 13px;white-space:normal">' +
       '反馈问题或建议请发邮件给开发者：<br>' +
@@ -1806,6 +1807,7 @@
       setEntries[se].onclick = function () { openSettings(); };
     }
     bind('openAppearance', openThemeModal);
+    bind('openFeedback', openFeedbackBox);
     var clEntry = $('viewChangelog');
     if (clEntry) clEntry.onclick = showChangelog;
     bind('editNick', doChangeNickname);
@@ -2775,6 +2777,12 @@
       });
     }
 
+    // 举报（任何人均可举报任意消息）
+    add('举报', 'danger', function () {
+      closeActSheet();
+      openReportForm(m);
+    });
+
     box.appendChild(list);
 
     var cancel = document.createElement('button');
@@ -2789,6 +2797,39 @@
   function closeActSheet() {
     var sheet = $('actSheet');
     if (sheet) sheet.className = 'actsheet hide';
+  }
+
+  /** 举报消息：打开反馈弹层，预填被举报消息引用 */
+  function openReportForm(m) {
+    var id = 'reportInput_' + (++askSeq);
+    var body = document.createElement('div');
+    var hint = document.createElement('div');
+    hint.className = 'ask-text';
+    hint.textContent = '举报「' + (m.senderName || '某用户') + '」的消息，请说明理由：';
+    body.appendChild(hint);
+    var ta = document.createElement('textarea');
+    ta.className = 'ask-field';
+    ta.id = id;
+    ta.rows = 4;
+    ta.placeholder = '例如：发布违规内容、骚扰、广告等';
+    ta.style.width = '100%';
+    ta.style.boxSizing = 'border-box';
+    body.appendChild(ta);
+    openModal('举报消息', body, function () {
+      var reason = String(ta.value || '').trim();
+      if (!reason) { toast('请填写举报理由'); return false; }
+      api('POST', '/api/feedback', {
+        type: 'complaint',
+        title: '举报消息',
+        content: reason,
+        refId: m.id,
+        refKind: 'message'
+      }, function (err) {
+        if (err) { toast(err.message || '举报失败', 3000); return; }
+        toast('举报已提交，官方将在 12 小时内处理');
+      });
+    }, '提交举报');
+    setTimeout(function () { if (ta.focus) ta.focus(); }, 30);
   }
 
   /* ---------------- 多选模式 ---------------- */
@@ -4675,6 +4716,156 @@
         history.replaceState(null, '', (location.pathname || '/'));
       }
     } catch (e3) { /* 老内核不支持就算了 */ }
+  }
+
+  /** 反馈箱：查看我的反馈列表 + 提交新反馈 */
+  function openFeedbackBox() {
+    var box = document.createElement('div');
+    box.style.maxHeight = '56vh';
+    box.style.overflow = 'auto';
+
+    var loading = document.createElement('div');
+    loading.className = 'empty';
+    loading.textContent = '加载中…';
+    box.appendChild(loading);
+
+    api('GET', '/api/feedback/mine', null, function (err, d) {
+      box.innerHTML = '';
+      var list = (d && d.feedback) || [];
+
+      // 提交新反馈按钮
+      var top = document.createElement('div');
+      top.style.marginBottom = '10px';
+      var newBtn = document.createElement('button');
+      newBtn.className = 'btn primary';
+      newBtn.textContent = '＋ 提交新反馈';
+      newBtn.onclick = function () { openFeedbackForm(box); };
+      top.appendChild(newBtn);
+      box.appendChild(top);
+
+      if (!list.length) {
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        emp.textContent = '你还没有提交过反馈。遇到问题或有好主意？点上方按钮提交。';
+        box.appendChild(emp);
+        return;
+      }
+
+      for (var i = 0; i < list.length; i++) {
+        var f = list[i];
+        var card = document.createElement('div');
+        card.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-2);';
+
+        var head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;';
+        var badge = document.createElement('span');
+        badge.className = 'badge ' + (f.type === 'idea' ? 'ok' : f.type === 'complaint' ? 'warn' : 'gray');
+        badge.textContent = f.type === 'idea' ? '建议' : f.type === 'complaint' ? '举报' : '问题';
+        head.appendChild(badge);
+        var st = document.createElement('span');
+        st.className = 'badge ' + (f.status === 'replied' ? 'ok' : 'gray');
+        st.textContent = f.status === 'replied' ? '已回复' : '处理中';
+        head.appendChild(st);
+        if (f.status === 'replied' && !f.seenAt) {
+          var dot = document.createElement('span');
+          dot.className = 'req-dot on';
+          head.appendChild(dot);
+        }
+        card.appendChild(head);
+
+        var t = document.createElement('div');
+        t.style.cssText = 'font-weight:600;font-size:13.5px;margin-bottom:3px;';
+        t.textContent = f.title || '无标题';
+        card.appendChild(t);
+
+        var c = document.createElement('div');
+        c.style.cssText = 'font-size:12.5px;color:var(--fg-2);line-height:1.6;margin-bottom:4px;';
+        c.textContent = f.content || '';
+        card.appendChild(c);
+
+        if (f.reply) {
+          var r = document.createElement('div');
+          r.style.cssText = 'background:var(--bg-2);padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--fg-2);line-height:1.6;';
+          r.innerHTML = '<b>官方回复：</b>' + esc(f.reply);
+          card.appendChild(r);
+          if (!f.seenAt) {
+            api('POST', '/api/feedback/' + f.id + '/seen', {}, function () {});
+          }
+        }
+
+        box.appendChild(card);
+      }
+    });
+
+    openModal('反馈箱', box, null, '关闭');
+  }
+
+  /** 反馈箱内：提交新反馈的表单 */
+  function openFeedbackForm(container) {
+    var idT = 'fbTitle_' + (++askSeq);
+    var idC = 'fbBody_' + (++askSeq);
+    var idType = 'fbType_' + (++askSeq);
+    var body = document.createElement('div');
+
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-bottom:10px;';
+    var types = [
+      { v: 'bug', l: '问题反馈' },
+      { v: 'idea', l: '功能建议' }
+    ];
+    for (var i = 0; i < types.length; i++) {
+      (function (tp) {
+        var b = document.createElement('button');
+        b.className = 'btn ghost';
+        b.textContent = tp.l;
+        b.onclick = function () {
+          var hid = document.getElementById(idType);
+          if (hid) hid.value = tp.v;
+          var all = row.querySelectorAll('button');
+          for (var j = 0; j < all.length; j++) {
+            all[j].className = all[j].className.replace(/primary/g, 'ghost');
+          }
+          b.className = 'btn primary';
+        };
+        row.appendChild(b);
+      })(types[i]);
+    }
+    body.appendChild(row);
+
+    var hid = document.createElement('input');
+    hid.type = 'hidden';
+    hid.id = idType;
+    hid.value = 'bug';
+    body.appendChild(hid);
+
+    var ti = document.createElement('input');
+    ti.className = 'ask-field';
+    ti.id = idT;
+    ti.type = 'text';
+    ti.placeholder = '标题（简短描述问题）';
+    ti.style.marginBottom = '8px';
+    body.appendChild(ti);
+
+    var ta = document.createElement('textarea');
+    ta.className = 'ask-field';
+    ta.id = idC;
+    ta.rows = 4;
+    ta.placeholder = '详细描述你遇到的问题或建议…';
+    body.appendChild(ta);
+
+    openModal('提交反馈', body, function () {
+      var title = String(ti.value || '').trim();
+      var content = String(ta.value || '').trim();
+      var type = String(hid.value || 'bug');
+      if (!title) { toast('请填写标题'); return false; }
+      if (!content) { toast('请填写内容'); return false; }
+      api('POST', '/api/feedback', { type: type, title: title, content: content }, function (err) {
+        if (err) { toast(err.message || '提交失败', 3000); return; }
+        toast('反馈已提交');
+        openFeedbackBox(); // 刷新列表
+      });
+    }, '提交');
+    setTimeout(function () { if (ti.focus) ti.focus(); }, 30);
   }
 
   function boot() {
