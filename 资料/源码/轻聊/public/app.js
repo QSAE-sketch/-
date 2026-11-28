@@ -4727,89 +4727,39 @@
 
   /** 反馈箱：普通用户看自己的反馈列表；官方账号看待处理审查与全部反馈 */
   function openFeedbackBox() {
-    var isAdmin = S.user && (S.user.founder || S.user.master);
-    if (isAdmin) {
-      openAdminFeedbackBox();
-      return;
+    if (window.FeedbackBox && window.FeedbackBox.open) {
+      window.FeedbackBox.open();
+    } else {
+      // 兼容旧版：feedback-adapter.js 未加载时的兜底
+      var isAdmin = S.user && (S.user.founder || S.user.master);
+      if (isAdmin) { openAdminFeedbackBox(); return; }
+      var box = document.createElement('div');
+      box.style.maxHeight = '56vh'; box.style.overflow = 'auto';
+      var loading = document.createElement('div'); loading.className = 'empty'; loading.textContent = '加载中…'; box.appendChild(loading);
+      api('GET', '/api/feedback/mine', null, function (err, d) {
+        box.innerHTML = '';
+        var list = (d && d.feedback) || [];
+        var top = document.createElement('div'); top.style.marginBottom = '10px';
+        var newBtn = document.createElement('button'); newBtn.className = 'btn primary'; newBtn.textContent = '＋ 提交新反馈';
+        newBtn.onclick = function () { openFeedbackForm(box); }; top.appendChild(newBtn); box.appendChild(top);
+        if (!list.length) { var emp = document.createElement('div'); emp.className = 'empty'; emp.textContent = '你还没有提交过反馈。遇到问题或有好主意？点上方按钮提交。'; box.appendChild(emp); return; }
+        for (var i = 0; i < list.length; i++) {
+          var f = list[i];
+          var card = document.createElement('div'); card.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-2);';
+          var head = document.createElement('div'); head.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;';
+          var badge = document.createElement('span'); badge.className = 'badge ' + (f.type === 'idea' ? 'ok' : f.type === 'complaint' ? 'warn' : 'gray');
+          badge.textContent = f.type === 'idea' ? '建议' : f.type === 'complaint' ? '举报' : '问题'; head.appendChild(badge);
+          var st = document.createElement('span'); st.className = 'badge ' + (f.status === 'replied' ? 'ok' : 'gray'); st.textContent = f.status === 'replied' ? '已回复' : '处理中'; head.appendChild(st);
+          if (f.status === 'replied' && !f.seenAt) { var dot = document.createElement('span'); dot.className = 'req-dot on'; head.appendChild(dot); }
+          card.appendChild(head);
+          var t = document.createElement('div'); t.style.cssText = 'font-weight:600;font-size:13.5px;margin-bottom:3px;'; t.textContent = f.title || '无标题'; card.appendChild(t);
+          var c = document.createElement('div'); c.style.cssText = 'font-size:12.5px;color:var(--fg-2);line-height:1.6;margin-bottom:4px;'; c.textContent = f.content || ''; card.appendChild(c);
+          if (f.reply) { var r = document.createElement('div'); r.style.cssText = 'background:var(--bg-2);padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--fg-2);line-height:1.6;'; r.innerHTML = '<b>官方回复：</b>' + esc(f.reply); card.appendChild(r); if (!f.seenAt) { api('POST', '/api/feedback/' + f.id + '/seen', {}, function () {}); } }
+          box.appendChild(card);
+        }
+      });
+      openModal('反馈箱', box, null, '关闭');
     }
-    var box = document.createElement('div');
-    box.style.maxHeight = '56vh';
-    box.style.overflow = 'auto';
-
-    var loading = document.createElement('div');
-    loading.className = 'empty';
-    loading.textContent = '加载中…';
-    box.appendChild(loading);
-
-    api('GET', '/api/feedback/mine', null, function (err, d) {
-      box.innerHTML = '';
-      var list = (d && d.feedback) || [];
-
-      // 提交新反馈按钮
-      var top = document.createElement('div');
-      top.style.marginBottom = '10px';
-      var newBtn = document.createElement('button');
-      newBtn.className = 'btn primary';
-      newBtn.textContent = '＋ 提交新反馈';
-      newBtn.onclick = function () { openFeedbackForm(box); };
-      top.appendChild(newBtn);
-      box.appendChild(top);
-
-      if (!list.length) {
-        var emp = document.createElement('div');
-        emp.className = 'empty';
-        emp.textContent = '你还没有提交过反馈。遇到问题或有好主意？点上方按钮提交。';
-        box.appendChild(emp);
-        return;
-      }
-
-      for (var i = 0; i < list.length; i++) {
-        var f = list[i];
-        var card = document.createElement('div');
-        card.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-2);';
-
-        var head = document.createElement('div');
-        head.style.cssText = 'display:flex;align-items:center;gap:6px;margin-bottom:4px;';
-        var badge = document.createElement('span');
-        badge.className = 'badge ' + (f.type === 'idea' ? 'ok' : f.type === 'complaint' ? 'warn' : 'gray');
-        badge.textContent = f.type === 'idea' ? '建议' : f.type === 'complaint' ? '举报' : '问题';
-        head.appendChild(badge);
-        var st = document.createElement('span');
-        st.className = 'badge ' + (f.status === 'replied' ? 'ok' : 'gray');
-        st.textContent = f.status === 'replied' ? '已回复' : '处理中';
-        head.appendChild(st);
-        if (f.status === 'replied' && !f.seenAt) {
-          var dot = document.createElement('span');
-          dot.className = 'req-dot on';
-          head.appendChild(dot);
-        }
-        card.appendChild(head);
-
-        var t = document.createElement('div');
-        t.style.cssText = 'font-weight:600;font-size:13.5px;margin-bottom:3px;';
-        t.textContent = f.title || '无标题';
-        card.appendChild(t);
-
-        var c = document.createElement('div');
-        c.style.cssText = 'font-size:12.5px;color:var(--fg-2);line-height:1.6;margin-bottom:4px;';
-        c.textContent = f.content || '';
-        card.appendChild(c);
-
-        if (f.reply) {
-          var r = document.createElement('div');
-          r.style.cssText = 'background:var(--bg-2);padding:8px 10px;border-radius:6px;font-size:12.5px;color:var(--fg-2);line-height:1.6;';
-          r.innerHTML = '<b>官方回复：</b>' + esc(f.reply);
-          card.appendChild(r);
-          if (!f.seenAt) {
-            api('POST', '/api/feedback/' + f.id + '/seen', {}, function () {});
-          }
-        }
-
-        box.appendChild(card);
-      }
-    });
-
-    openModal('反馈箱', box, null, '关闭');
   }
 
   /** 官方反馈中心：待处理审查 + 全部反馈 */
