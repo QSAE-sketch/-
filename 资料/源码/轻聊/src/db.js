@@ -419,6 +419,12 @@ function meta(ns, doc) {
     // 网盘分享：k1=userId（我的分享列表），k2=fileId（某文件是否已被分享）
     case 'shares':
       return { k1: doc.userId, k2: doc.fileId };
+    /*
+     * 网盘目录：文件夹是「空目录也能存在」的实体，所以单独存一条记录。
+     * 目录里有什么文件仍以 files.folder 为准（不冗余成员关系，移动文件即改 folder）。
+     */
+    case 'driveFolders':
+      return { k1: doc.ownerId, k2: doc.name };
     default:
       return { k1: null, k2: null };
   }

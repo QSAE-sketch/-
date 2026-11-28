@@ -86,6 +86,23 @@ async function cloudCleanup() {
 
 let beforeCloud = new Set();
 
+/**
+ * 中断兜底：套件被 Ctrl+C / 超时 SIGTERM 打断时，清理代码原本永远跑不到，
+ * 本次测试新建的云端账号就会永久留在线上（历史事故：一次超时中断留下 146 个测试号）。
+ * 这里捕获信号，先清完再退出；同一时刻只允许执行一次清理。
+ */
+let cleaningUp = false;
+async function emergencyCleanup(sig) {
+  if (cleaningUp) return;
+  cleaningUp = true;
+  console.log('\n[清理] 收到 ' + sig + '，先清理本次测试新增的云端数据再退出…');
+  try { await stopServer(); } catch (_) {}
+  try { await cloudCleanup(); } catch (_) {}
+  process.exit(sig === 'SIGINT' ? 130 : 143);
+}
+process.on('SIGINT', () => emergencyCleanup('SIGINT'));
+process.on('SIGTERM', () => emergencyCleanup('SIGTERM'));
+
 async function snapshotCloud() {
   if (BACKEND !== 'cloud') return;
   try {

@@ -886,6 +886,9 @@ async function purgeAccount(userId) {
     db.del('files', f.id);
     stats.files++;
   }
+  // 3.1) 网盘分享与自建目录（不随文件级联，必须单独清）
+  for (const s of db.byIdx('shares', 'k1', userId)) db.del('shares', s.id);
+  for (const d of db.byIdx('driveFolders', 'k1', userId)) db.del('driveFolders', d.id);
   // 4) 我的会话
   for (const s of db.byIdx('sessions', 'k2', userId)) db.del('sessions', s.id);
   // 5) 好友关系 + 好友申请

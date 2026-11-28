@@ -11,8 +11,9 @@
   var THEME_PREF_KEY = 'll_theme_pref';   // 手动模式下的选择：light | dark
   var THEME_TIME_KEY = 'll_theme_time';   // 时间模式的阈值 {"d":7,"n":18}
   var SKIN_KEY = 'll_skin';               // 当前皮肤 id（'' = 默认原版）
+  var GOLDFX_KEY = 'll_goldfx';           // 金色流光特效开关：'off' = 关闭动画
   var KEEP_LOCAL_KEYS = ['ll_token', HIDDEN_REV_KEY, SEEN_REV_KEY, SETTINGS_KEY,
-    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY, SKIN_KEY];
+    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY, SKIN_KEY, GOLDFX_KEY];
 
   /** 任意值转非负整数（数字展示用；与基础版 num 同义） */
   function num(v) {
@@ -332,6 +333,20 @@
      应用时同步给 <html data-skin="id">，样式里的 [data-skin] 作用域生效。
      选择存本机 localStorage，刷新后自动恢复；列表从 /api/skins 拉。
      ================================================================ */
+
+  /**
+   * 「消息金色流光」开关（本机偏好）。
+   * 最高权限账号发的消息默认带金色流动动画，长时间看很晃眼；
+   * 关掉后颜色照旧是金色，只是不再有流光扫过 —— 只影响本机显示。
+   */
+  function goldFxOn() {
+    try { return localStorage.getItem(GOLDFX_KEY) !== 'off'; } catch (e) { return true; }
+  }
+  function applyGoldFx() {
+    try {
+      document.documentElement.setAttribute('data-goldfx', goldFxOn() ? 'on' : 'off');
+    } catch (e) { }
+  }
 
   /** 应用皮肤；传空串恢复默认原版 */
   function skinApply(id) {
@@ -1121,6 +1136,7 @@
       skinApply(S.skin);
       if (S.view === 'public') renderPublic();
     });
+    applyGoldFx();
     switchView(S.view);
     // 深链进房：房间列表加载后自动打开
     if (S.deepRoom) {
@@ -1638,6 +1654,12 @@
   }
 
   function renderMe() {
+    // 未登录 / 登录态刚失效时兜底，避免直接读 S.user 崩掉整页
+    if (!S.user) {
+      var box0 = $('view');
+      if (box0) box0.innerHTML = '<div class="empty">登录状态已失效，请重新登录。</div>';
+      return;
+    }
     var h = '<div class="card"><div class="card-h">账号信息</div>' +
       '<div class="row me-av-row"><div class="me-av" id="myAvatar"></div>' +
       '<div class="r-main"><div class="r-title">' + esc(S.user.nickname) + '</div>' +
@@ -1890,6 +1912,13 @@
       '「按时间」按本机时间在日间与夜间之间自动切换，可自行设定切换时刻；' +
       '「手动」由你自己指定浅色或深色。选择会保存在本机，浏览器与 App 共用同一份偏好。</div></div>';
 
+    h += '<div class="card"><div class="card-h">外观 · 特效</div>' +
+      '<div class="row"><div class="r-main"><div class="r-title">消息金色流光</div>' +
+      '<div class="r-sub">关闭后保留金色，但不再流动闪光</div></div>' +
+      '<button class="btn small ' + (goldFxOn() ? 'primary' : 'ghost') + '" id="btnGoldFx">' +
+      (goldFxOn() ? '已开启' : '已关闭') + '</button></div>' +
+      '<div class="set-note">只影响本机显示，不改变任何人发出的消息内容；看久了晃眼可以随时关掉。</div></div>';
+
     h += '<div class="card"><div class="card-h">存储</div>' +
       '<div class="row"><div class="r-main"><div class="r-title">清除缓存</div>' +
       '<div class="r-sub" id="cacheInfo">正在统计缓存占用…</div></div>' +
@@ -1928,6 +1957,12 @@
     bind('btnClearCache', doClearCache);
     bind('btnClearChat', doClearChatAsk);
     bind('btnPickDir', doPickSaveDir);
+    bind('btnGoldFx', function () {
+      try { localStorage.setItem(GOLDFX_KEY, goldFxOn() ? 'off' : 'on'); } catch (e) { }
+      applyGoldFx();
+      toast(goldFxOn() ? '金色流光已开启' : '金色流光已关闭');
+      renderSettings();
+    });
     refreshCacheInfo();
     refreshSaveDirInfo();
     loadVersionInfo();
@@ -3937,15 +3972,16 @@
       }
       h += '</div>';
 
-      // 目录
-      if (d.folders && d.folders.length) {
-        h += '<div class="drive-chips drive-folders"><button class="chip' + (d.folder === null ? ' on' : '') + '" data-dfolder="__all__">全部目录</button>';
-        h += '<button class="chip' + (d.folder === '' ? ' on' : '') + '" data-dfolder="__root__">根目录</button>';
-        for (var j = 0; j < d.folders.length; j++) {
-          h += '<button class="chip' + (d.folder === d.folders[j] ? ' on' : '') + '" data-dfolder="' + esc(d.folders[j]) + '">📁 ' + esc(d.folders[j]) + '</button>';
-        }
-        h += '</div>';
+      // 目录：工具条常驻（空网盘也能先建目录），当前目录可删（仅空目录允许删）
+      h += '<div class="drive-chips drive-folders">';
+      h += '<button class="chip' + (d.folder === null ? ' on' : '') + '" data-dfolder="__all__">全部目录</button>';
+      h += '<button class="chip' + (d.folder === '' ? ' on' : '') + '" data-dfolder="__root__">根目录</button>';
+      for (var j = 0; j < (d.folders || []).length; j++) {
+        h += '<button class="chip' + (d.folder === d.folders[j] ? ' on' : '') + '" data-dfolder="' + esc(d.folders[j]) + '">📁 ' + esc(d.folders[j]) + '</button>';
       }
+      h += '<button class="chip d-newfolder" id="dNewFolder">＋ 新建目录</button>';
+      if (d.folder) h += '<button class="chip d-delfolder" id="dDelFolder">删除「' + esc(d.folder) + '」</button>';
+      h += '</div>';
 
       h += '<div class="drive-meta">共 ' + d.total + ' 个文件 · <span id="driveSort" class="link">' +
         (d.sort === 'size' ? '按大小' : (d.sort === 'name' ? '按名称' : '按时间')) + '</span></div>';
@@ -4001,12 +4037,17 @@
       if (it.folder) sub.push('📁 ' + it.folder);
       sub.push(fmtTimeShort(it.createdAt));
     }
-    var right = mode === 'trash' ? '恢复' : (mode === 'shares' ? '复制' : '');
+    var right = '';
+    if (mode === 'trash') right = '<button class="mini-btn" data-dquick="trash">恢复</button>';
+    else if (mode === 'shares') {
+      right = '<button class="mini-btn" data-dquick="shares">复制</button>' +
+        '<button class="mini-btn danger" data-dquick="off">下线</button>';
+    }
     return '<div class="drow" data-fid="' + esc(it.fileId || it.shareId) + '" data-mode="' + mode + '">' +
       '<div class="dicon t-' + esc(it.type || 'other') + '">' + icon + '</div>' +
       '<div class="dmain"><div class="dname">' + esc(it.name || '(未命名)') + '</div>' +
       '<div class="dsub">' + esc(sub.filter(Boolean).join(' · ')) + '</div></div>' +
-      (right ? '<button class="mini-btn" data-dquick="' + mode + '">' + right + '</button>' : '') +
+      right +
       '</div>';
   }
 
@@ -4053,6 +4094,8 @@
       chips[j].onclick = function () {
         var t = this.getAttribute('data-dtype');
         var f = this.getAttribute('data-dfolder');
+        // 目录工具按钮（新建/删除）不是筛选 chip，跳过，由下面单独绑定
+        if (this.id === 'dNewFolder' || this.id === 'dDelFolder') return;
         if (t !== null && t !== undefined) { d.type = t; }
         if (f !== null && f !== undefined) {
           if (f === '__all__') d.folder = null;
@@ -4064,6 +4107,9 @@
         loadDrive();
       };
     }
+
+    if ($('dNewFolder')) $('dNewFolder').onclick = function () { doDriveNewFolder(); };
+    if ($('dDelFolder')) $('dDelFolder').onclick = function () { doDriveDeleteFolder(d.folder); };
 
     if ($('driveSort')) {
       $('driveSort').onclick = function () {
@@ -4094,6 +4140,7 @@
         if (quick) {
           if (quick === 'trash') doDriveRestore(id);
           else if (quick === 'shares') doDriveCopyShare(id);
+          else if (quick === 'off') doDriveOfflineShare(id);
           return;
         }
         if (mode === 'shares') return doDriveCopyShare(id);
@@ -4181,14 +4228,78 @@
     }, '保存');
   }
 
-  function doDriveMove(it) {
-    askInput('移动文件', '移动到哪个目录？（留空 = 移到根目录）', it.folder || '', function (folder) {
-      api('PATCH', '/api/drive/files/' + it.fileId, { folder: String(folder) }, function (err) {
+  /** 新建目录：建完自动跳到该目录，方便立刻往里传/移文件 */
+  function doDriveNewFolder() {
+    askInput('新建目录', '目录名：', '', function (name) {
+      name = String(name || '').trim();
+      if (!name) { toast('目录名不能为空'); return false; }
+      api('POST', '/api/drive/folders', { name: name }, function (err) {
         if (err) { toast(err.message); return; }
-        toast('已移动');
+        toast('已创建目录');
+        var d = D();
+        d.folder = name;
+        d.page = 1;
+        renderDrive();
         loadDrive();
       });
+    }, '创建');
+  }
+
+  function doDriveDeleteFolder(name) {
+    if (!name) return;
+    askConfirm('删除目录', '删除空目录「' + esc(name) + '」？<br>目录里还有文件时会提示先移走。', function () {
+      api('DELETE', '/api/drive/folders/' + encodeURIComponent(name), null, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('目录已删除');
+        var d = D();
+        if (d.folder === name) d.folder = null;
+        renderDrive();
+        loadDrive();
+      });
+    }, '删除');
+  }
+
+  /**
+   * 移动文件：目录列表直接点选，比手打目录名可靠（旧版是输入框，容易打错建出重复目录）。
+   * 需要新目录时在底部填名字，会先建目录再移动。
+   */
+  function doDriveMove(it) {
+    var d = D();
+    var folders = d.folders || [];
+    var h = '<div class="d-form">' +
+      '<label class="d-label">选择目录</label><div class="d-move-list">' +
+      '<button class="d-move-item' + (!it.folder ? ' on' : '') + '" data-mv="">🏠 根目录</button>';
+    for (var i = 0; i < folders.length; i++) {
+      h += '<button class="d-move-item' + (it.folder === folders[i] ? ' on' : '') + '" data-mv="' + esc(folders[i]) + '">📁 ' + esc(folders[i]) + '</button>';
+    }
+    h += '</div>' +
+      '<label class="d-label">或新建目录并移入</label>' +
+      '<input id="dmNew" class="inp" type="text" placeholder="新目录名">' +
+      '</div>';
+
+    function moveTo(folder) {
+      api('PATCH', '/api/drive/files/' + it.fileId, { folder: String(folder || '') }, function (err) {
+        if (err) { toast(err.message); return; }
+        toast(folder ? ('已移动到「' + folder + '」') : '已移到根目录');
+        closeModal();
+        loadDrive();
+      });
+    }
+
+    openModal('移动文件', h, function () {
+      var name = String($('dmNew').value || '').trim();
+      if (!name) { toast('请选择目录，或填一个新目录名'); return false; }
+      api('POST', '/api/drive/folders', { name: name }, function (err) {
+        // 目录已存在不算失败，直接移进去
+        if (err && !/已存在/.test(err.message || '')) { toast(err.message); return; }
+        moveTo(name);
+      });
     }, '移动');
+
+    var items = document.querySelectorAll('#modalBody .d-move-item');
+    for (var k = 0; k < items.length; k++) {
+      items[k].onclick = function () { moveTo(this.getAttribute('data-mv') || ''); };
+    }
   }
 
   function doDriveDelete(it) {
@@ -4224,8 +4335,60 @@
 
   /* ---------------- 分享 ---------------- */
 
+  /** 分享文案：链接 + 提取码（有加密时） */
+  function shareText(s) {
+    var url = location.origin + (s.url || ('/s/' + s.shareId));
+    return url + (s.encrypted ? ('\n提取码：' + s.code) : '');
+  }
+
+  /**
+   * 已存在分享时的面板：直接给链接，不再让人重复「创建」。
+   * 老版本的问题：点分享永远弹创建表单，明明已经分享过也看不出现有链接。
+   */
+  function showSharePanel(it, s) {
+    var txt = shareText(s);
+    var body = '<div class="d-share-out">' +
+      '<div class="d-detail-name">' + esc(it.name) + '</div>' +
+      '<div class="d-detail-sub">' + (s.encrypted ? '提取码 ' + esc(s.code) : '公开链接') +
+      ' · 有效至 ' + fmtTimeShort(s.expireAt) + ' · 下载 ' + (s.downloads || 0) + ' 次</div>' +
+      '<textarea class="inp d-share-url" readonly rows="3">' + esc(txt) + '</textarea>' +
+      '<div class="d-detail-sub">链接已经在生效中，直接复制发出去即可；不想再被下载可随时「下线」。</div>' +
+      '</div>' +
+      '<div class="d-acts">' +
+      '<button class="btn ghost" id="dsCopy">复制链接</button>' +
+      '<button class="btn danger" id="dsOff">下线分享</button>' +
+      '</div>';
+    openModal('分享链接', body, null, '关闭');
+
+    $('dsCopy').onclick = function () { copyText(txt); };
+    $('dsOff').onclick = function () {
+      askConfirm('下线分享', '下线后这个链接立刻失效，别人再打开会提示「已取消」。<br>确定现在就不再让别人下载吗？', function () {
+        api('DELETE', '/api/drive/shares/' + s.shareId, null, function (err) {
+          if (err) { toast(err.message); return; }
+          toast('分享已下线');
+          closeModal();
+          loadDrive();
+          if (D().tab === 'shares') loadDriveShares();
+        });
+      }, '下线');
+    };
+  }
+
   function doDriveShare(it) {
+    // 已分享且未过期 → 直接显示现有链接（含提取码/下载次数/有效期），不重复创建
+    if (it.share && it.share.shareId && !it.share.expired) {
+      return showSharePanel(it, {
+        shareId: it.share.shareId,
+        url: '/s/' + it.share.shareId,
+        code: it.share.code,
+        encrypted: it.share.encrypted,
+        expireAt: it.share.expireAt,
+        downloads: it.share.downloads
+      });
+    }
+
     var body = '<div class="d-form">' +
+      (it.share && it.share.expired ? '<div class="set-warn">上一次分享已过期，可重新创建。</div>' : '') +
       '<label class="d-label">有效期（天）</label>' +
       '<input id="dsDays" class="inp" type="number" min="1" max="365" value="7">' +
       '<label class="d-label"><input id="dsEnc" type="checkbox"> 需要提取码</label>' +
@@ -4238,18 +4401,21 @@
       api('POST', '/api/drive/files/' + it.fileId + '/share',
         { days: days, encrypted: enc, code: code }, function (err, data) {
           if (err) { toast(err.message); return; }
-          var url = location.origin + data.url;
-          var txt = url + (data.encrypted ? ('\n提取码：' + data.code) : '');
-          openModal('分享已创建',
-            '<div class="d-share-out"><div class="d-detail-name">' + esc(it.name) + '</div>' +
-            '<div class="d-detail-sub">' + (data.encrypted ? '提取码 ' + esc(data.code) : '公开链接') +
-            ' · 有效至 ' + fmtTimeShort(data.expireAt) + '</div>' +
-            '<textarea class="inp d-share-url" readonly rows="3">' + esc(txt) + '</textarea></div>',
-            null, '关闭');
-          $('modalBody').onclick = function () { copyText(txt); };
+          showSharePanel(it, data);
           loadDrive();
         });
     }, '创建');
+  }
+
+  /** 下线分享（分享列表里的快捷操作） */
+  function doDriveOfflineShare(shareId) {
+    askConfirm('下线分享', '下线后链接立刻失效，确定吗？', function () {
+      api('DELETE', '/api/drive/shares/' + shareId, null, function (err) {
+        if (err) { toast(err.message); return; }
+        toast('分享已下线');
+        loadDriveShares();
+      });
+    }, '下线');
   }
 
   function doDriveCopyShare(shareId) {

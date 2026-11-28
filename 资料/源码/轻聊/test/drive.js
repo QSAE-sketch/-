@@ -372,6 +372,37 @@ function stopServer() {
   r = await req('POST', '/api/drive/files/' + img.fileId + '/share', { encrypted: true, code: 'x' }, A.token);
   check('提取码过短被拒 400', r.status === 400, r.json);
 
+  /* ================= E2. 目录 ================= */
+  console.log('\n【E2】目录：新建 / 重名 / 移入 / 删除');
+
+  r = await req('POST', '/api/drive/folders', { name: '照片' }, A.token);
+  check('新建目录成功', r.status === 200 && r.json.name === '照片', r.json);
+  r = await req('POST', '/api/drive/folders', { name: '照片' }, A.token);
+  check('同名目录被拒 409', r.status === 409, r.json);
+  r = await req('POST', '/api/drive/folders', { name: '   ' }, A.token);
+  check('空目录名被拒 400', r.status === 400, r.json);
+  r = await req('POST', '/api/drive/folders', { name: 'a:b' }, A.token);
+  check('目录名含非法字符被拒 400', r.status === 400, r.json);
+
+  r = await req('GET', '/api/drive/files', null, A.token);
+  check('空目录也出现在目录清单', (r.json.folders || []).indexOf('照片') >= 0, r.json.folders);
+  check('目录清单不重复', (r.json.folders || []).filter((x) => x === '照片').length === 1, r.json.folders);
+
+  r = await req('PATCH', '/api/drive/files/' + doc.fileId, { folder: '照片' }, A.token);
+  check('文件可移入目录', r.status === 200 && r.json.folder === '照片', r.json.folder);
+  r = await req('GET', '/api/drive/files?folder=' + encodeURIComponent('照片'), null, A.token);
+  check('按目录筛出该文件', r.json.total === 1 && r.json.items[0].fileId === doc.fileId, r.json.total);
+
+  r = await req('DELETE', '/api/drive/folders/' + encodeURIComponent('照片'), null, A.token);
+  check('非空目录不可删 400', r.status === 400, r.json);
+
+  r = await req('PATCH', '/api/drive/files/' + doc.fileId, { folder: '' }, A.token);
+  check('文件移回根目录', r.json.folder === '', r.json.folder);
+  r = await req('DELETE', '/api/drive/folders/' + encodeURIComponent('照片'), null, A.token);
+  check('空目录可删除', r.status === 200 && r.json.deleted === true, r.json);
+  r = await req('GET', '/api/drive/files', null, A.token);
+  check('删除后目录消失', (r.json.folders || []).indexOf('照片') < 0, r.json.folders);
+
   /* ================= F. 隔离与配额 ================= */
   console.log('\n【F】权限隔离与配额闸门');
 

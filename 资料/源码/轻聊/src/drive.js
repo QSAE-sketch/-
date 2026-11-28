@@ -13,6 +13,7 @@
  */
 
 const crypto = require('crypto');
+const { randomId } = require('./util');
 
 /** 回收站保留期：软删除后 30 天物理清除 */
 const TRASH_KEEP_MS = 30 * 24 * 3600 * 1000;
@@ -190,8 +191,16 @@ module.exports = function registerDrive(deps) {
     const items = list.slice(start, start + size).map((f) => toFile(f));
 
     // 顺带把目录清单回给前端，省一次请求
+    // 目录来源有两处：显式创建的空/非空目录（driveFolders），以及文件上挂的 folder 字段。
+    // 合在一起返回，前端不需要区分「文件夹是新建的还是移动时顺手建的」。
     const folders = [];
     const seen = Object.create(null);
+    for (const d of db.byIdx('driveFolders', 'k1', ctx.user.id)) {
+      const name = String(d.name || '');
+      if (!name || seen[name]) continue;
+      seen[name] = true;
+      folders.push(name);
+    }
     for (const f of db.filesOfOwner(ctx.user.id)) {
       if (!isLiveFile(f, ctx.user.id)) continue;
       const d = String(f.folder || '');
@@ -284,6 +293,50 @@ module.exports = function registerDrive(deps) {
 
     db.updateFile(f);
     ok(res, toFile(f));
+  });
+
+  /* ================================================================ */
+  /* 目录：新建 / 删除                                                  */
+  /* ================================================================ */
+
+  /** 目录名归一化 + 校验，返回 {name} 或 {error} */
+  function parseFolderName(raw) {
+    let name = String(raw == null ? '' : raw).trim().replace(/^\/+|\/+$/g, '');
+    if (!name) return { error: '目录名不能为空' };
+    if (name.length > 80) return { error: '目录名过长（最多 80 字）' };
+    if (/[\\:*?"<>|]/.test(name)) return { error: '目录名不能包含 \\ : * ? " < > |' };
+    return { name };
+  }
+
+  /** 该目录名在「我的网盘」里是否已存在（显式目录或已有文件挂载） */
+  function folderExists(userId, name) {
+    if (db.byIdx('driveFolders', 'k1', userId).some((d) => d.name === name)) return true;
+    return db.filesOfOwner(userId).some((f) => isLiveFile(f, userId) && String(f.folder || '') === name);
+  }
+
+  route('POST', '/api/drive/folders', async (req, res, ctx) => {
+    const b = await readJson(req);
+    const p = parseFolderName(b.name);
+    if (p.error) return fail(res, 400, p.error);
+    if (folderExists(ctx.user.id, p.name)) return fail(res, 409, '同名目录已存在');
+
+    const doc = { id: randomId('fd'), ownerId: ctx.user.id, name: p.name, createdAt: now() };
+    db.put('driveFolders', doc);
+    ok(res, { id: doc.id, name: doc.name, createdAt: doc.createdAt });
+  });
+
+  /** 删除目录：只允许删空目录，避免一键把文件「删没」（文件请先在网盘里删或移走） */
+  route('DELETE', '/api/drive/folders/:name', async (req, res, ctx) => {
+    const p = parseFolderName(decodeURIComponent(ctx.params.name || ''));
+    if (p.error) return fail(res, 400, p.error);
+    const used = db.filesOfOwner(ctx.user.id)
+      .filter((f) => isLiveFile(f, ctx.user.id) && String(f.folder || '') === p.name).length;
+    if (used) return fail(res, 400, '目录里还有 ' + used + ' 个文件，先移走或删除后再删目录');
+
+    for (const d of db.byIdx('driveFolders', 'k1', ctx.user.id)) {
+      if (d.name === p.name) db.del('driveFolders', d.id);
+    }
+    ok(res, { deleted: true, name: p.name });
   });
 
   /* ================================================================ */
