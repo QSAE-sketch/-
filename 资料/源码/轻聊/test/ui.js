@@ -257,6 +257,18 @@ const code = fs.readFileSync(appPath, 'utf8');
 const errors = [];
 process.on('uncaughtException', (e) => errors.push('uncaught: ' + e.message));
 
+// 【统计修复】本文件用 console.log('✓ …') 逐条断言，但不输出「通过 N 失败 M」汇总行，
+// 导致 tools/run-suite.js 的统计正则匹配不到、把全部断言算成 0/0（817 少算 58 条）。
+// 这里劫持 console.log 统计 ✓ 条数，结尾输出标准汇总行，让全量统计真实反映。
+let _passCount = 0;
+const _origLog = console.log;
+console.log = function () {
+  let s = '';
+  for (let i = 0; i < arguments.length; i++) s += (i ? ' ' : '') + arguments[i];
+  if (typeof s === 'string' && s.indexOf('✓') >= 0) _passCount++;
+  return _origLog.apply(console, arguments);
+};
+
 try {
   // eslint-disable-next-line no-new-func
   new Function(code)();
@@ -1352,13 +1364,16 @@ function wait(ms) { return new Promise((r) => setTimeout(r, ms)); }
 
   console.log('\n────────────────────────────');
   if (errors.length) {
+    console.error('通过: ' + _passCount + '  失败: ' + errors.length);
     console.error('前端交互错误 ' + errors.length + ' 处');
     process.exit(1);
   }
   console.log('前端交互全部通过，0 运行时错误');
+  console.log('通过: ' + _passCount + '  失败: 0');
   process.exit(0);
 })().catch((e) => {
   console.error('❌ 前端测试异常:', e && e.message);
   console.error(e && e.stack ? e.stack.split('\n').slice(0, 6).join('\n') : '');
+  console.error('通过: ' + _passCount + '  失败: 1');
   process.exit(1);
 });
