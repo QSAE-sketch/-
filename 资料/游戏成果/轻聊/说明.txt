@@ -5,11 +5,11 @@
     技术：C++ / Win32 + GDI 自绘 + GDI+ 图像，WinHTTP 联网，静态链接
     体积：约 666 KB（681472 B）
     位置：U 盘记忆库 资料/游戏成果/轻聊/轻聊.exe（离线副本）
-- 轻聊.apk
+- 轻聊-v2.7.1.apk　（命名规则：轻聊-v<版本名>.apk，版本号取 version.json）
     平台：Android 原生客户端（Java，minSdk 19，兼容红米 Note 2 / Android 4.4）
     技术：纯 Java Activity + ListView，无 WebView、无第三方依赖
     体积：约 136 KB（classes.dex 111432 B）
-    位置：本地工作副本 资料/游戏成果/轻聊/轻聊.apk + U 盘离线副本
+    位置：本地工作副本 资料/游戏成果/轻聊/轻聊-v2.7.1.apk + U 盘离线副本
     构建：见 资料/源码/轻聊/android/README.md（JDK17 + Gradle 8.9）
 版本：2.7.1（code 32）　更新：2026-11-27
 说明：二进制产物不进 Git 主库（.gitignore 排除 apk/exe），需用时从本地工作副本或 U 盘离线副本取。

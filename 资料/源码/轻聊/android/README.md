@@ -119,6 +119,14 @@ D:/android-sdk/gradle-8.9/bin/gradle clean assembleDebug assembleRelease
 - `app/build/outputs/apk/debug/app-debug.apk`
 - `app/build/outputs/apk/release/app-release.apk`
 
+出包后归档命名（约定，版本号取 `version.json` 的 `name`）：
+
+```bash
+# 复制到记忆库成品目录时带上版本号，避免多版本同名互相覆盖
+cp app/build/outputs/apk/release/app-release.apk "../../../资料/游戏成果/轻聊/轻聊-v<版本名>.apk"
+# 例：轻聊-v2.7.1.apk（版本名 2.7.1 即 version.json 的 name）
+```
+
 ### 关键配置
 
 | 项 | 值 | 位置 |
