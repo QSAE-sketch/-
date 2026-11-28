@@ -3,7 +3,7 @@
   "name": "鸦青 Crow",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "鸦羽的青黑，瑞士网格排版；无衬线 + 纯色块",
+  "description": "鸦青：青黑压到墨青，命令行冷调",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "swiss",

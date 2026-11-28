@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
 <rect width="320" height="200" fill="#f1f3f3"/>
 <rect x="10" y="10" width="146" height="180" rx="2" fill="#fcfdfc" stroke="#c7d1cd" stroke-width="1"/>
-<rect x="10" y="10" width="146" height="30" rx="2" fill="#2ac089"/>
-<text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#151515">碧玉</text>
+<rect x="10" y="10" width="146" height="30" rx="2" fill="#2e7a63"/>
+<text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#ffffff">碧玉</text>
 <rect x="20" y="50" width="104" height="16" rx="3" fill="#c7d1cd" opacity=".5"/>
 <rect x="20" y="74" width="112" height="22" rx="2" fill="#fcfdfc" stroke="#c7d1cd"/>
-<rect x="34" y="112" width="98" height="22" rx="2" fill="#ddeee8"/>
+<rect x="34" y="112" width="98" height="22" rx="2" fill="#ddeee9"/>
 <rect x="166" y="10" width="144" height="180" rx="2" fill="#1e2422" stroke="#4f5f59" stroke-width="1"/>
-<rect x="166" y="10" width="144" height="30" rx="2" fill="#7beac1"/>
-<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#151515">碧玉</text>
+<rect x="166" y="10" width="144" height="30" rx="2" fill="#2a3a35"/>
+<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#badccf">碧玉</text>
 <rect x="176" y="50" width="102" height="16" rx="3" fill="#4f5f59" opacity=".5"/>
 <rect x="176" y="74" width="118" height="22" rx="2" fill="#1e2422" stroke="#4f5f59"/>
-<rect x="190" y="112" width="106" height="22" rx="2" fill="#326753"/>
+<rect x="190" y="112" width="106" height="22" rx="2" fill="#2d5848"/>
 </svg>

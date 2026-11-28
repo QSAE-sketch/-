@@ -3,7 +3,7 @@
   "name": "石青 Azurite",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "矿物颜料的石青，纯色块；无衬线 + 纯色块",
+  "description": "石青：矿物蓝压成石板青",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "swiss",

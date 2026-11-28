@@ -41,13 +41,13 @@
   --pick-border: #d1ccc7;
   --pick-on: #b4795f;
   --up-bg: #f5edea;
-  --up-fg: #b4795f;
+  --up-fg: #895c48;
   --up-track: #e3e1dd;
   --up-fill: #b4795f;
   --toast-bg: rgba(69, 63, 56, 0.93);
   --toast-fg: #fdfcfc;
   --badge-bg: #f5edea;
-  --badge-fg: #b4795f;
+  --badge-fg: #895c48;
   --badge-gray-bg: #f1f0ee;
   --badge-gray-fg: #6b6257;
   --badge-warn-bg: #f7eede;
@@ -57,13 +57,13 @@
   --role-3-bg: #f7eede;
   --role-3-fg: #9c6a1a;
   --role-2-bg: #f5edea;
-  --role-2-fg: #b4795f;
+  --role-2-fg: #895c48;
   --role-1-bg: #f1f0ee;
   --role-1-fg: #307e57;
   --role-0-bg: #f1f0ee;
   --role-0-fg: #6b6257;
   --mact-off: #d1ccc7;
-  --link: #b4795f;
+  --link: #94634e;
   --link-hover: #a0644b;
   --code-bg: #f8f7f7;
   --code-fg: #2d271f;
@@ -176,8 +176,11 @@
   --drop: 0 2px 8px rgba(240, 237, 234, 0.2);
 }
 
+html[data-skin="clay"] .card-h { background: var(--accent-soft); color: var(--accent);
+  border-bottom: 3px solid var(--accent); border-radius: 0; }
+
+
 /* 结构特征 */
 html[data-skin="clay"]  .card, html[data-skin="clay"]  .msg-box, html[data-skin="clay"]  .inp, html[data-skin="clay"]  input[type=text], html[data-skin="clay"]  textarea { border-radius: 2px; }
 html[data-skin="clay"]  body { font-family: Arial,"PingFang SC",sans-serif; }
 html[data-skin="clay"]  .card, html[data-skin="clay"]  .msg-box { border: 2px solid var(--border-3) !important; box-shadow: 3px 3px 0 var(--border-3); }
-html[data-skin="clay"]  .card-h { background: var(--accent); color: var(--on-accent); border-radius: 0; }

@@ -85,6 +85,7 @@ public class SettingsActivity extends Activity {
     private void render() {
         box.removeAllViews();
         renderTheme();
+        renderFont();
         renderFx();
         renderStorage();
         renderDownload();
@@ -157,6 +158,59 @@ public class SettingsActivity extends Activity {
         box.addView(c);
     }
 
+    /* ---------------- 外观·字体 ---------------- */
+
+    private void renderFont() {
+        LinearLayout c = Ui.card(this);
+        c.setLayoutParams(Ui.cardLp());
+        c.addView(Ui.cardHead(this, "外观 · 字体"));
+        c.addView(Ui.gap(this, 10));
+
+        final String[][] FONTS = {
+            {"", "系统默认"}, {"hei", "黑体"}, {"song", "宋体"},
+            {"kai", "楷体"}, {"yuan", "圆体"}, {"mono", "等宽"}
+        };
+        final String cur = prefs.fontId();
+        // 每行 3 个按钮，两行铺开
+        LinearLine row = null;
+        for (int i = 0; i < FONTS.length; i++) {
+            if (i % 3 == 0) {
+                row = new LinearLine();
+                row.line = Ui.row(this);
+                c.addView(row.line);
+            }
+            final String fid = FONTS[i][0];
+            final String fname = FONTS[i][1];
+            boolean on = fid.equals(cur);
+            TextView t = Ui.text(this, fname, 13, on ? Ui.onAccent : Ui.fg2);
+            if (on) t.setTypeface(Typeface.DEFAULT_BOLD);
+            t.setGravity(Gravity.CENTER);
+            t.setPadding(0, Ui.dp(7), 0, Ui.dp(7));
+            t.setBackgroundDrawable(on ? Ui.rect(Ui.accent, 4, 0, 0) : Ui.rect(Ui.surface2, 4, Ui.border, 1));
+            t.setClickable(true);
+            t.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    if (fid.equals(prefs.fontId())) return;
+                    prefs.setFontId(fid);
+                    Ui.setFont(fid);
+                    Ui.toast0(SettingsActivity.this, "已切换字体：" + fname);
+                    recreate();
+                }
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (i % 3 > 0) lp.leftMargin = Ui.dp(5);
+            row.line.addView(t, lp);
+        }
+        c.addView(Ui.gap(this, 8));
+        c.addView(Ui.text(this,
+                "选择后全站立即生效；系统未装所选字体时会自动退回同类字体显示。", 11.5f, Ui.fg3));
+        box.addView(c);
+    }
+
+    /** 字体按钮的每行容器（仅用于循环内临时持有行引用） */
+    private static class LinearLine { LinearLayout line; }
+
     /* ---------------- 外观·特效 ---------------- */
 
     private void renderFx() {
@@ -167,11 +221,11 @@ public class SettingsActivity extends Activity {
 
         LinearLayout row = Ui.row(this);
         LinearLayout left = Ui.col(this);
-        left.addView(Ui.text(this, "消息金色流光", 15, Ui.fg));
+        left.addView(Ui.text(this, "最高权限账号金色特效", 15, Ui.fg));
         final boolean on = prefs.goldFx();
         TextView sub = Ui.text(this, on
-                ? "最高权限账号发的消息带金色流动光效，关闭后仍是金色，但不再闪动。"
-                : "已关闭流动光效：金色保留，不再闪动。", 11.5f, Ui.fg3);
+                ? "最高权限账号的名字与气泡带金色装饰。"
+                : "已彻底关闭全部金色装饰，名字与气泡恢复普通样式。", 11.5f, Ui.fg3);
         sub.setPadding(0, Ui.dp(3), 0, 0);
         left.addView(sub);
         row.addView(left, new LinearLayout.LayoutParams(0,

@@ -3,7 +3,7 @@
   "name": "靛青 Indigo",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "蓝染布料的深靛，克制留白；大量留白 + 极细描边",
+  "description": "靛青：深靛收敛，浅色偏墨蓝",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "minimal",

@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
 <rect width="320" height="200" fill="#f1f2f4"/>
 <rect x="10" y="10" width="146" height="180" rx="2" fill="#fcfcfd" stroke="#c6cad2" stroke-width="1"/>
-<rect x="10" y="10" width="146" height="30" rx="2" fill="#297799"/>
+<rect x="10" y="10" width="146" height="30" rx="2" fill="#2e5f7c"/>
 <text x="20" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#ffffff">鸦青</text>
 <rect x="20" y="50" width="104" height="16" rx="3" fill="#c6cad2" opacity=".5"/>
 <rect x="20" y="74" width="112" height="22" rx="2" fill="#fcfcfd" stroke="#c6cad2"/>
-<rect x="34" y="112" width="98" height="22" rx="2" fill="#dde9ee"/>
+<rect x="34" y="112" width="98" height="22" rx="2" fill="#dde8ee"/>
 <rect x="166" y="10" width="144" height="180" rx="2" fill="#1d2025" stroke="#4c5361" stroke-width="1"/>
-<rect x="166" y="10" width="144" height="30" rx="2" fill="#74c4e7"/>
-<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#151515">鸦青</text>
+<rect x="166" y="10" width="144" height="30" rx="2" fill="#26313a"/>
+<text x="176" y="31" font-family="Arial,sans-serif" font-size="15" font-weight="bold" fill="#b1cbd9">鸦青</text>
 <rect x="176" y="50" width="102" height="16" rx="3" fill="#4c5361" opacity=".5"/>
 <rect x="176" y="74" width="118" height="22" rx="2" fill="#1d2025" stroke="#4c5361"/>
-<rect x="190" y="112" width="106" height="22" rx="2" fill="#325767"/>
+<rect x="190" y="112" width="106" height="22" rx="2" fill="#2d4958"/>
 </svg>

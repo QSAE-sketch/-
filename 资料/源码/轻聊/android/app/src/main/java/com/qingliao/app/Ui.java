@@ -43,6 +43,26 @@ public class Ui {
     public static int topbar, topbarFg, tabbar, overlay;
     public static String skinName = "原版";
 
+    /* 界面字体：null = 系统默认；其余为用户选择的字体 */
+    public static Typeface uiTypeface = null;
+    private static String uiFontId = "";
+
+    /** 按字体 id 设置全局界面字体；新创建的 TextView 自动应用 */
+    public static void setFont(String id) {
+        uiFontId = id == null ? "" : id;
+        Typeface tf = null;
+        try {
+            if ("song".equals(uiFontId)) tf = Typeface.create("serif", Typeface.NORMAL);
+            else if ("kai".equals(uiFontId)) tf = Typeface.create("serif", Typeface.NORMAL);
+            else if ("hei".equals(uiFontId)) tf = Typeface.create("sans-serif", Typeface.NORMAL);
+            else if ("yuan".equals(uiFontId)) tf = Typeface.create("sans-serif-light", Typeface.NORMAL);
+            else if ("mono".equals(uiFontId)) tf = Typeface.create("monospace", Typeface.NORMAL);
+        } catch (Throwable t) { tf = null; }
+        uiTypeface = tf;
+    }
+
+    public static String fontId() { return uiFontId; }
+
     public static float density = 2f;
 
     public static void init(Context c) {
@@ -340,12 +360,15 @@ public class Ui {
         t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
         t.setTextColor(color);
         t.setLineSpacing(dp(3), 1f);
+        if (uiTypeface != null) t.setTypeface(uiTypeface);
         return t;
     }
 
     public static TextView bold(Context c, CharSequence s, float sp, int color) {
         TextView t = text(c, s, sp, color);
-        t.setTypeface(Typeface.DEFAULT_BOLD);
+        // 选了字体时用该字体的粗体变体，避免退回系统默认字体
+        if (uiTypeface != null) t.setTypeface(uiTypeface, Typeface.BOLD);
+        else t.setTypeface(Typeface.DEFAULT_BOLD);
         return t;
     }
 

@@ -326,7 +326,7 @@ public class ChatActivity extends Activity {
             nameRow.setGravity(Gravity.LEFT);
             TextView nm = Ui.text(this, m.senderName, 11.5f, Ui.fg3);
             nameRow.addView(nm);
-            if (m.senderFounder) {
+            if (m.senderFounder && prefs.goldFx()) {
                 nameRow.addView(Ui.gapW(this, 5));
                 nameRow.addView(Ui.badge(this, "站长"));
             }
@@ -336,24 +336,26 @@ public class ChatActivity extends Activity {
 
         LinearLayout bubble = Ui.col(this);
         bubble.setPadding(Ui.dp(11), Ui.dp(8), Ui.dp(11), Ui.dp(8));
-        if (m.senderFounder) {
+        // 金色特效关闭时：最高权限账号的气泡恢复普通样式（与网页端语义一致）
+        boolean goldOn = prefs.goldFx();
+        if (m.senderFounder && goldOn) {
             bubble.setBackgroundDrawable(Ui.gradient(0xFFC8A030, 0xFFF1DA8C, 6));
-            if (prefs.goldFx()) {
-                ObjectAnimator a = ObjectAnimator.ofFloat(bubble, "alpha", 0.90f, 1f);
-                a.setDuration(1400);
-                a.setRepeatCount(ValueAnimator.INFINITE);
-                a.setRepeatMode(ValueAnimator.REVERSE);
-                a.start();
-            }
+            ObjectAnimator a = ObjectAnimator.ofFloat(bubble, "alpha", 0.90f, 1f);
+            a.setDuration(1400);
+            a.setRepeatCount(ValueAnimator.INFINITE);
+            a.setRepeatMode(ValueAnimator.REVERSE);
+            a.start();
         } else {
             bubble.setBackgroundDrawable(Ui.rect(m.mine ? Ui.bubbleMe : Ui.bubbleOther, 6,
                     Ui.dark ? Ui.border : Ui.border, 1));
         }
 
-        int textColor = m.senderFounder ? 0xFF241A00 : (m.mine ? Ui.bubbleMeFg : Ui.bubbleOtherFg);
+        int textColor = (m.senderFounder && goldOn) ? 0xFF241A00
+                : (m.mine ? Ui.bubbleMeFg : Ui.bubbleOtherFg);
 
         if (m.recalled) {
-            TextView t = Ui.text(this, "该消息已撤回", 13, m.senderFounder ? 0xFF4A3A00 : Ui.fg3);
+            TextView t = Ui.text(this, "该消息已撤回", 13,
+                    (m.senderFounder && goldOn) ? 0xFF4A3A00 : Ui.fg3);
             t.setTypeface(Typeface.DEFAULT, Typeface.ITALIC);
             bubble.addView(t);
         } else if (m.hasFile && m.file != null) {
@@ -369,7 +371,7 @@ public class ChatActivity extends Activity {
             bubble.addView(t);
         }
 
-        int metaColor = m.senderFounder ? 0xFF5B4700
+        int metaColor = (m.senderFounder && goldOn) ? 0xFF5B4700
                 : (m.mine ? Ui.mix(Ui.bubbleMeFg, Ui.bubbleMe, 0.42f) : Ui.fg3);
         TextView meta = Ui.text(this, time(m.createdAt), 10, metaColor);
         meta.setGravity(Gravity.RIGHT);

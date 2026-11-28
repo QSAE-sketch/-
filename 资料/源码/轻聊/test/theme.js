@@ -365,7 +365,13 @@ const mainAct = fs.readFileSync(
 check('Android 主界面是原生实现（不再加载 WebView）',
   mainAct.indexOf('android.webkit') < 0 && mainAct.indexOf('loadUrl') < 0 &&
   mainAct.indexOf('new WebView') < 0);
-check('Android 主界面含原生消息列表（ListView）', mainAct.indexOf('ListView') > 0);
+// v3.0.0 起消息列表在 ChatActivity 中用 ScrollView + LinearLayout 自绘（不再用 ListView），
+// 断言原生列表容器与气泡行渲染仍然存在。
+const chatAct = fs.readFileSync(
+  path.join(ROOT, 'android/app/src/main/java/com/qingliao/app/ChatActivity.java'), 'utf8');
+check('Android 聊天页含原生消息列表容器（ScrollView + 自绘气泡行）',
+  chatAct.indexOf('ScrollView') > 0 && chatAct.indexOf('private LinearLayout list') > 0 &&
+  chatAct.indexOf('bubbleRow') > 0);
 check('引导脚本支持 sys 参数', html.indexOf('sys=(dark|light)') > 0);
 
 /* ---------- 8.6 原生 URL 标记：首屏与运行期必须一致 ---------- */

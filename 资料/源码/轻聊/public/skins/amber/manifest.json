@@ -3,7 +3,7 @@
   "name": "琥珀 Amber",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "蜜蜡琥珀的暖黄，旧纸底配深褐字；衬线 + 旧纸暖调",
+  "description": "琥珀：蜜蜡暖黄压暗，不做荧光橙",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "vintage",

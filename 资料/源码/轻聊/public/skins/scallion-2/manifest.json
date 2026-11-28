@@ -3,7 +3,7 @@
   "name": "葱茏 Verdant",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "草木葱茏的绿，硬朗边框；粗边框 + 硬阴影",
+  "description": "葱茏：草木绿压成沉稳叶绿",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "brutal",

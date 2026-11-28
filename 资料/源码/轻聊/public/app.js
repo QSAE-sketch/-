@@ -11,9 +11,20 @@
   var THEME_PREF_KEY = 'll_theme_pref';   // 手动模式下的选择：light | dark
   var THEME_TIME_KEY = 'll_theme_time';   // 时间模式的阈值 {"d":7,"n":18}
   var SKIN_KEY = 'll_skin';               // 当前皮肤 id（'' = 默认原版）
+  var SKINSTAR_KEY = 'll_skin_stars';     // 星标皮肤 id 列表（JSON 数组），打开皮肤列表时置顶
+  var FONT_KEY = 'll_font';               // 界面字体 id（'' = 系统默认）
   var GOLDFX_KEY = 'll_goldfx';           // 金色流光特效开关：'off' = 关闭动画
+  // 可选字体：id / 显示名 / 字体栈（中文优先，英文 fallback）
+  var FONTS = [
+    { id: '', name: '系统默认', stack: '' },
+    { id: 'hei', name: '黑体 · 现代', stack: '"PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif' },
+    { id: 'song', name: '宋体 · 书卷', stack: '"Songti SC", "SimSun", "Noto Serif CJK SC", serif' },
+    { id: 'kai', name: '楷体 · 手写', stack: '"Kaiti SC", "KaiTi", "STKaiti", serif' },
+    { id: 'yuan', name: '圆体 · 圆润', stack: '"Yuanti SC", "YouYuan", "Microsoft YaHei", sans-serif' },
+    { id: 'mono', name: '等宽 · 极客', stack: '"SF Mono", "Consolas", "Courier New", monospace' }
+  ];
   var KEEP_LOCAL_KEYS = ['ll_token', HIDDEN_REV_KEY, SEEN_REV_KEY, SETTINGS_KEY,
-    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY, SKIN_KEY, GOLDFX_KEY];
+    THEME_MODE_KEY, THEME_PREF_KEY, THEME_TIME_KEY, SKIN_KEY, SKINSTAR_KEY, FONT_KEY, GOLDFX_KEY];
 
   /** 任意值转非负整数（数字展示用；与基础版 num 同义） */
   function num(v) {
@@ -70,7 +81,9 @@
     version: null,               // /api/version 的返回（含 drive.enabled 等能力标记）
     drive: null,                 // 网盘界面状态（首次进入网盘页时初始化）
     skins: [],                   // 皮肤列表（标准版）
-    skin: localStorage.getItem(SKIN_KEY) || ''   // 当前应用的皮肤 id
+    skin: localStorage.getItem(SKIN_KEY) || '',  // 当前应用的皮肤 id
+    skinStars: loadSkinStars(),  // 星标皮肤 id 集合（对象），打开列表时置顶
+    font: localStorage.getItem(FONT_KEY) || ''   // 界面字体 id
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -334,6 +347,58 @@
      选择存本机 localStorage，刷新后自动恢复；列表从 /api/skins 拉。
      ================================================================ */
 
+  /** 读取星标皮肤集合（坏数据容忍：任何异常都退回空对象） */
+  function loadSkinStars() {
+    var out = {};
+    try {
+      var raw = localStorage.getItem(SKINSTAR_KEY);
+      var arr = raw ? JSON.parse(raw) : [];
+      if (Object.prototype.toString.call(arr) === '[object Array]') {
+        for (var i = 0; i < arr.length; i++) if (arr[i]) out[String(arr[i])] = true;
+      }
+    } catch (e) { }
+    return out;
+  }
+
+  /** 落盘星标集合（存成数组，便于人工查看 / 跨版本兼容） */
+  function saveSkinStars() {
+    var arr = [];
+    for (var k in S.skinStars) if (S.skinStars[k]) arr.push(k);
+    try { localStorage.setItem(SKINSTAR_KEY, JSON.stringify(arr)); } catch (e) { }
+  }
+
+  /** 切换某套皮肤的星标；返回切换后的状态 */
+  function skinStarToggle(id) {
+    if (!id) return false;
+    if (S.skinStars[id]) { delete S.skinStars[id]; }
+    else { S.skinStars[id] = true; }
+    saveSkinStars();
+    return !!S.skinStars[id];
+  }
+
+  /* ---------------- 字体 ---------------- */
+  function fontFind(id) {
+    for (var i = 0; i < FONTS.length; i++) if (FONTS[i].id === id) return FONTS[i];
+    return FONTS[0];
+  }
+
+  /** 应用界面字体：写 data-font 属性 + 注入字体栈变量 */
+  function fontApply(id) {
+    S.font = id || '';
+    try { localStorage.setItem(FONT_KEY, S.font); } catch (e) { }
+    var root = document.documentElement;
+    var f = fontFind(S.font);
+    try {
+      if (S.font) {
+        root.setAttribute('data-font', S.font);
+        root.style.setProperty('--font-ui', f.stack || '');
+      } else {
+        root.removeAttribute('data-font');
+        root.style.removeProperty('--font-ui');  // 回到 CSS 里的系统默认字体栈
+      }
+    } catch (e) { }
+  }
+
   /**
    * 「消息金色流光」开关（本机偏好）。
    * 最高权限账号发的消息默认带金色流动动画，长时间看很晃眼；
@@ -447,6 +512,12 @@
     var q = qEl ? String(qEl.value || '').trim() : '';
     var list = [];
     for (var k = 0; k < S.skins.length; k++) if (skinMatch(S.skins[k], q)) list.push(S.skins[k]);
+    // 星标置顶：星标皮肤按原顺序排前面，其余跟在后面（搜索时也置顶，方便快速找到）
+    list.sort(function (a, b) {
+      var sa = S.skinStars[a.id] ? 1 : 0;
+      var sb = S.skinStars[b.id] ? 1 : 0;
+      return sb - sa;
+    });
     var cnt = $('skinCount');
     if (cnt) cnt.textContent = q
       ? ('找到 ' + list.length + ' 套皮肤（共 ' + S.skins.length + ' 套）')
@@ -468,7 +539,7 @@
     for (var i = 0; i < list.length; i++) {
       var s = list[i];
       var active = S.skin === s.id;
-      h += '<div class="skin-card' + (active ? ' on' : '') + '">' +
+      h += '<div class="skin-card' + (active ? ' on' : '') + (S.skinStars[s.id] ? ' starred' : '') + '">' +
         '<div class="skin-pv">' +
         (s.preview
           ? '<img src="' + esc(s.preview) + '" alt="预览">'
@@ -479,6 +550,9 @@
         '<div class="r-sub">' + esc(s.description || s.author || '') +
         ' · v' + esc(s.version) + (s.builtin ? ' · 内置' : (s.isPublic ? ' · 公开' : ' · 私密')) + '</div>' +
         '<div class="skin-acts">' +
+        '<span class="mini-btn skin-star' + (S.skinStars[s.id] ? ' on' : '') + '" data-skin-star="' + esc(s.id) + '" ' +
+        'title="' + (S.skinStars[s.id] ? '取消星标' : '加星标，下次置顶') + '">' +
+        (S.skinStars[s.id] ? '★ 已星标' : '☆ 星标') + '</span>' +
         (active ? '' : '<span class="mini-btn" data-skin-use="' + esc(s.id) + '">使用</span>') +
         '<span class="mini-btn" data-skin-preview="' + esc(s.id) + '">预览</span>' +
         (s.mine && !s.builtin
@@ -488,6 +562,15 @@
         '</div></div></div>';
     }
     box.innerHTML = h;
+    var stars = box.querySelectorAll('[data-skin-star]');
+    for (var st = 0; st < stars.length; st++) {
+      stars[st].onclick = function () {
+        var id = this.getAttribute('data-skin-star');
+        var on = skinStarToggle(id);
+        toast(on ? '已加星标，下次打开置顶' : '已取消星标');
+        renderSkinList();
+      };
+    }
     var uses = box.querySelectorAll('[data-skin-use]');
     for (var u = 0; u < uses.length; u++) {
       uses[u].onclick = function () {
@@ -1912,9 +1995,21 @@
       '「按时间」按本机时间在日间与夜间之间自动切换，可自行设定切换时刻；' +
       '「手动」由你自己指定浅色或深色。选择会保存在本机，浏览器与 App 共用同一份偏好。</div></div>';
 
+    // 字体：一排小按钮，点选即应用；视觉上用低饱和描边，不做荧光高亮
+    var fontBtns = '';
+    for (var fi = 0; fi < FONTS.length; fi++) {
+      var fo = FONTS[fi];
+      fontBtns += '<span class="mini-btn font-opt' + (S.font === fo.id ? ' on' : '') +
+        '" data-font="' + esc(fo.id) + '">' + esc(fo.name) + '</span>';
+    }
+    h += '<div class="card"><div class="card-h">外观 · 字体</div>' +
+      '<div class="font-opts">' + fontBtns + '</div>' +
+      '<div class="set-note">选择后全站立即生效并保存在本机。系统字体跟随设备；' +
+      '若系统未安装所选字体，会自动退回同类字体显示。</div></div>';
+
     h += '<div class="card"><div class="card-h">外观 · 特效</div>' +
-      '<div class="row"><div class="r-main"><div class="r-title">消息金色流光</div>' +
-      '<div class="r-sub">关闭后保留金色，但不再流动闪光</div></div>' +
+      '<div class="row"><div class="r-main"><div class="r-title">最高权限账号金色特效</div>' +
+      '<div class="r-sub">关闭后彻底去掉全部金色装饰，名字与气泡恢复普通样式</div></div>' +
       '<button class="btn small ' + (goldFxOn() ? 'primary' : 'ghost') + '" id="btnGoldFx">' +
       (goldFxOn() ? '已开启' : '已关闭') + '</button></div>' +
       '<div class="set-note">只影响本机显示，不改变任何人发出的消息内容；看久了晃眼可以随时关掉。</div></div>';
@@ -1954,13 +2049,22 @@
       box.appendChild(panel);
       themeSettingsPanel = panel;
     }
+    var fontOpts = document.querySelectorAll('.font-opt[data-font]');
+    for (var fo2 = 0; fo2 < fontOpts.length; fo2++) {
+      fontOpts[fo2].onclick = function () {
+        var id = this.getAttribute('data-font') || '';
+        fontApply(id);
+        toast('已切换字体：' + fontFind(id).name);
+        renderSettings();
+      };
+    }
     bind('btnClearCache', doClearCache);
     bind('btnClearChat', doClearChatAsk);
     bind('btnPickDir', doPickSaveDir);
     bind('btnGoldFx', function () {
       try { localStorage.setItem(GOLDFX_KEY, goldFxOn() ? 'off' : 'on'); } catch (e) { }
       applyGoldFx();
-      toast(goldFxOn() ? '金色流光已开启' : '金色流光已关闭');
+      toast(goldFxOn() ? '金色特效已开启' : '金色特效已全部关闭');
       renderSettings();
     });
     refreshCacheInfo();
@@ -4574,6 +4678,8 @@
   }
 
   function boot() {
+    // 字体属于纯本机外观偏好，登录页也要生效，因此不放在 enterApp() 里
+    fontApply(S.font);
     pickCallbackToken();
     if (!S.token) return;
     api('GET', '/api/me', null, function (err, data) {

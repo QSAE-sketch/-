@@ -23,6 +23,9 @@
 :root {
   color-scheme: light;
 
+  /* 界面字体：JS 按用户选择注入具体字体栈，空值 = 用 body 默认字体栈 */
+  --font-ui: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+
   /* ---- 基础面 ---- */
   --bg: #f4f6f9;
   --surface: #ffffff;
@@ -138,6 +141,9 @@
 [data-theme="dark"] {
   color-scheme: dark;
 
+  /* 界面字体与浅色档共用同一变量（JS 注入到 :root 即可，深色档不覆盖） */
+  --font-ui: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+
   --bg: #0d1524;
   --surface: #151f33;
   --surface-2: #1b2740;
@@ -248,7 +254,7 @@
 html, body { margin: 0; padding: 0; height: 100%; }
 html { background: var(--bg); }
 body {
-  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-ui);
   font-size: 15px; line-height: 1.55; color: var(--fg); background: var(--bg);
   -webkit-text-size-adjust: 100%;
   transition: background-color .2s ease, color .2s ease;
@@ -729,16 +735,45 @@ footer { color: var(--fg-3); }
 }
 
 /*
- * 关闭金色流光（设置 → 外观 · 特效）。
- * 只停动画，不撤配色：金色渐变、金边、金字全部保留，静止下来后
- * 反倒更容易看清正文（这也是提出这个开关的原因）。
+ * 关闭特效（设置 → 外观 · 特效）。
+ * 彻底去掉「最高权限账号」的所有金色装饰 —— 名字框、气泡烫金、头像金环
+ * 全部退回普通样式，不是「停在静止的金色」，而是当这个人没有特效一样。
+ * 用「覆盖到最朴素」的写法：所有金色规则都会被这里的规则压掉。
  */
-html[data-goldfx="off"] .msg.founder .bub,
-html[data-goldfx="off"] .msg.founder .av.gold-fill,
 html[data-goldfx="off"] .who.founder-who {
+  padding: 0; border: 0; border-radius: 0;
+  background-image: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: var(--fg-2) !important;
+  box-shadow: none !important;
+  font-weight: var(--fw-medium);
+  letter-spacing: normal;
+  animation: none !important;
+}
+html[data-goldfx="off"] .msg.founder .bub,
+html[data-goldfx="off"] [data-theme="dark"] .msg.founder .bub {
+  color: var(--bubble-fg) !important;
+  border-color: var(--border) !important;
+  background-image: none !important;
+  background: var(--bubble) !important;
+  box-shadow: none !important;
   animation: none !important;
 }
 html[data-goldfx="off"] .msg.founder .bub::after { display: none !important; }
+html[data-goldfx="off"] .msg.founder .bub .who { color: var(--bubble-who) !important; }
+html[data-goldfx="off"] .msg.founder .bub .txt { color: var(--bubble-fg) !important; }
+html[data-goldfx="off"] .msg.founder .bub .meta,
+html[data-goldfx="off"] .msg.founder .bub .recalled { color: var(--bubble-meta) !important; }
+html[data-goldfx="off"] .msg.founder .bub .filecard .fn { color: var(--bubble-fg) !important; }
+html[data-goldfx="off"] .msg.founder .bub .filecard .fs { color: var(--bubble-meta) !important; }
+html[data-goldfx="off"] .msg.founder .bub .filecard .fi { filter: none !important; }
+html[data-goldfx="off"] .msg.founder .av {
+  box-shadow: none !important;
+}
+html[data-goldfx="off"] .msg.founder .av.gold-fill {
+  background-image: none !important;
+  animation: none !important;
+}
 
 /* 头像框：内亮 + 双层金环 + 外光晕，不改变头像本身的色块逻辑 */
 .msg.founder .av {
@@ -1025,6 +1060,19 @@ html[data-goldfx="off"] .msg.founder .bub::after { display: none !important; }
 .skin-meta { flex: 1; min-width: 0; }
 .skin-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .skin-acts .mini-btn { padding: 4px 9px; }
+/* 星标皮肤：打星后置顶，星标按钮用暖金色区分（低饱和，不做荧光） */
+.skin-card.starred { border-color: var(--accent-soft-border); }
+.skin-acts .skin-star { color: var(--fg-3); }
+.skin-acts .skin-star.on {
+  color: #9a6b12; border-color: #c8a45a; background: rgba(200, 164, 90, .10);
+}
+html[data-theme="dark"] .skin-acts .skin-star.on {
+  color: #e0bb6a; border-color: #8a6b2c; background: rgba(224, 187, 106, .12);
+}
+/* 字体选择：一行小按钮，选中态用主色描边（低存在感，不做高亮块） */
+.font-opts { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0; }
+.font-opt { white-space: nowrap; }
+.font-opt.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 .skin-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 .skin-tools .mini-btn { flex: 1; text-align: center; }
 .skin-preview-box { text-align: center; }

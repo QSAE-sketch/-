@@ -19,6 +19,8 @@ public class Prefs {
     private static final String K_THEME_DARK = "themeDark";   // 手动模式下的选择
     private static final String K_GOLD_FX = "goldFx";         // 消息金色流光
     private static final String K_SKIN = "skinId";            // 皮肤 id，空=原版
+    private static final String K_SKIN_STARS = "skinStars";   // 星标皮肤 id（逗号分隔），打开列表置顶
+    private static final String K_FONT = "fontId";            // 界面字体 id，空=系统默认
     private static final String K_SKIN_CSS = "skinCss_";      // 皮肤 CSS 缓存
     private static final String K_DOWNLOAD_PUBLIC = "dlPublic";
     private static final String K_TIME_START = "timeDarkStart";
@@ -43,8 +45,39 @@ public class Prefs {
     public boolean goldFx() { return sp.getBoolean(K_GOLD_FX, true); }
     public void setGoldFx(boolean v) { sp.edit().putBoolean(K_GOLD_FX, v).apply(); }
 
+    public String fontId() { return sp.getString(K_FONT, ""); }
+    public void setFontId(String id) { sp.edit().putString(K_FONT, id == null ? "" : id).apply(); }
+
     public String skinId() { return sp.getString(K_SKIN, ""); }
     public void setSkinId(String id) { sp.edit().putString(K_SKIN, id == null ? "" : id).apply(); }
+
+    /** 星标皮肤：用逗号分隔的 id 串存本机 */
+    public boolean skinStarred(String id) {
+        if (id == null || id.length() == 0) return false;
+        String raw = sp.getString(K_SKIN_STARS, "");
+        if (raw.length() == 0) return false;
+        String[] parts = raw.split(",");
+        for (String p : parts) if (p.equals(id)) return true;
+        return false;
+    }
+
+    /** 切换星标，返回切换后是否为星标态 */
+    public boolean toggleSkinStar(String id) {
+        if (id == null || id.length() == 0) return false;
+        java.util.LinkedHashSet<String> set = new java.util.LinkedHashSet<String>();
+        String raw = sp.getString(K_SKIN_STARS, "");
+        if (raw.length() > 0) {
+            String[] parts = raw.split(",");
+            for (String p : parts) if (p.length() > 0) set.add(p);
+        }
+        boolean on;
+        if (set.contains(id)) { set.remove(id); on = false; }
+        else { set.add(id); on = true; }
+        StringBuilder sb = new StringBuilder();
+        for (String s : set) { if (sb.length() > 0) sb.append(','); sb.append(s); }
+        sp.edit().putString(K_SKIN_STARS, sb.toString()).apply();
+        return on;
+    }
 
     public String skinCss(String id) { return sp.getString(K_SKIN_CSS + id, ""); }
     public void setSkinCss(String id, String css) { sp.edit().putString(K_SKIN_CSS + id, css).apply(); }
@@ -84,6 +117,7 @@ public class Prefs {
     /** 把当前皮肤配色套进 Ui；返回是否成功 */
     public boolean applySkinColors() {
         boolean darkNow = darkNow();
+        Ui.setFont(fontId());   // 界面字体：每个 Activity 初始化时都同步一次
         Ui.palette(darkNow);
         String id = skinId();
         if (id.length() == 0) {

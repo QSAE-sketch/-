@@ -14,6 +14,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -212,9 +214,19 @@ public class SkinActivity extends Activity {
         LinearLayout card = Ui.card(this);
         card.setLayoutParams(Ui.cardLp());
         card.setPadding(Ui.dp(4), Ui.dp(4), Ui.dp(4), Ui.dp(4));
+        // 星标置顶：星标皮肤排前面，组内保持服务器原顺序
+        final List<Api.Skin> ordered = new ArrayList<Api.Skin>(all);
+        Collections.sort(ordered, new Comparator<Api.Skin>() {
+            public int compare(Api.Skin a, Api.Skin b) {
+                boolean sa = prefs.skinStarred(a.id);
+                boolean sb = prefs.skinStarred(b.id);
+                if (sa == sb) return 0;
+                return sa ? -1 : 1;
+            }
+        });
         int shown = 0;
-        for (int i = 0; i < all.size(); i++) {
-            Api.Skin s = all.get(i);
+        for (int i = 0; i < ordered.size(); i++) {
+            Api.Skin s = ordered.get(i);
             if (keyword.length() > 0 && !match(s, keyword)) continue;
             String right = s.id.equals(prefs.skinId()) ? "当前" : "";
             if (shown > 0) card.addView(Ui.hline(this));
@@ -294,6 +306,24 @@ public class SkinActivity extends Activity {
         r.addView(mid, new LinearLayout.LayoutParams(0,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (tag.length() > 0) r.addView(Ui.badge(this, tag));
+
+        // 星标按钮：打星后置顶；独立点击，不触发整行「应用皮肤」
+        if (skin != null) {
+            final Api.Skin target = skin;
+            final TextView star = Ui.text(this, prefs.skinStarred(target.id) ? "★" : "☆",
+                    20f, prefs.skinStarred(target.id) ? 0xFFB8862E : Ui.fg3);
+            star.setPadding(Ui.dp(8), Ui.dp(4), Ui.dp(2), Ui.dp(4));
+            star.setClickable(true);
+            star.setOnClickListener(new View.OnClickListener() {
+                public void onClick(View v) {
+                    boolean on = prefs.toggleSkinStar(target.id);
+                    Ui.toast0(SkinActivity.this, on ? "已加星标，下次置顶" : "已取消星标");
+                    renderList();
+                }
+            });
+            r.addView(star, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        }
 
         r.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {

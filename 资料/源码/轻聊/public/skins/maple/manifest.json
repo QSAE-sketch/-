@@ -3,7 +3,7 @@
   "name": "枫叶 Maple",
   "version": "1.0.0",
   "author": "系统内置",
-  "description": "霜降枫叶的朱红，杂志标题感；衬线标题 + 细分割线",
+  "description": "枫叶：朱红压成砖红",
   "entry": "skin.css",
   "preview": "preview.svg",
   "style": "editorial",
