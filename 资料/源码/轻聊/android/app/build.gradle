@@ -22,8 +22,8 @@ android {
 
     defaultConfig {
         applicationId "com.qingliao.app"
-        // 兼容到 Android 4.4（API 19）：红米 Note 2 的最低系统版本
-        minSdk 19
+        // 按 2026-11 的决定：只保证 Android 5.0.2（API 21）及以上，功能不再裁剪
+        minSdk 21
         targetSdk 34
         versionCode appVersion.code as int
         versionName appVersion.name
@@ -67,13 +67,11 @@ android {
         checkReleaseBuilds false
     }
 
-    // 产物文件名固定为「轻聊.apk」，不缀版本号。
-    // 版本号只在应用内「设置 → 关于」展示（由线上 /api/version 实时下发），
-    // 文件名/应用名都不带版本，避免「看着是旧包、其实内容早已更新」。
+    // 产物文件名带版本号：轻聊-v<版本名>.apk（大佬 2026-11-28 定的规则）
     applicationVariants.all { variant ->
         variant.outputs.all { output ->
             if (variant.buildType.name == 'release') {
-                outputFileName = '轻聊.apk'
+                outputFileName = "轻聊-v${appVersion.name}.apk"
             }
         }
     }

@@ -787,6 +787,11 @@ public class Api {
      * 服务端单片 4MB，这里按服务端返回的 chunkSize 走，不自己猜。
      */
     public String upload(String roomId, File file, Progress cb, Context ctx) throws ApiException {
+        return uploadTo(file, roomId, cb);
+    }
+
+    /** roomId 为空/空串 = 网盘文件；返回 fileId */
+    public String uploadTo(File file, String roomId, Progress cb) throws ApiException {
         long size = file.length();
         if (size <= 0) throw new ApiException("文件为空");
         if (size > 200L * 1024 * 1024) throw new ApiException("文件超过 200MB 上限");
@@ -797,7 +802,7 @@ public class Api {
             JSONObject req = new JSONObject();
             req.put("name", file.getName());
             req.put("size", size);
-            req.put("roomId", roomId);
+            if (roomId != null && roomId.length() > 0) req.put("roomId", roomId);
             req.put("mime", guessMime(file.getName()));
             JSONObject j = unwrap(postJson("/api/files/init", req));
             fileId = j.optString("fileId", "");
@@ -890,6 +895,293 @@ public class Api {
         if (n.endsWith(".pdf")) return "application/pdf";
         if (n.endsWith(".txt")) return "text/plain";
         return "application/octet-stream";
+    }
+
+    /* ================================================================ */
+    /* 网盘                                                              */
+    /* ================================================================ */
+
+    public static class DriveStorage {
+        public long used, quota, remain;
+        public String usedText = "", quotaText = "", remainText = "";
+        public int percent, fileCount, trashCount;
+    }
+
+    public static class DriveFile {
+        public String fileId = "", name = "", sizeText = "", mime = "", type = "", typeLabel = "";
+        public String folder = "", roomName = "", downloadUrl = "", rawUrl = "", thumbUrl = "";
+        public long size, createdAt, deletedAt;
+        public boolean fromChat, isImage, isVideo;
+        public ShareInfo share;
+        public long expireAt;
+        public int remainDays;
+    }
+
+    public static class ShareInfo {
+        public String shareId = "", url = "", code = "", fileName = "", fileSizeText = "";
+        public boolean encrypted, expired, revoked, needCode;
+        public long expireAt, createdAt;
+        public int downloads;
+    }
+
+    public static class DriveList {
+        public List<DriveFile> items = new ArrayList<DriveFile>();
+        public List<String> folders = new ArrayList<String>();
+        public int total, page, pages;
+        public boolean hasMore;
+    }
+
+    private static DriveFile parseDriveFile(JSONObject o) {
+        DriveFile f = new DriveFile();
+        f.fileId = o.optString("fileId", "");
+        f.name = o.optString("name", "");
+        f.size = o.optLong("size", 0);
+        f.sizeText = o.optString("sizeText", "");
+        f.mime = o.optString("mime", "");
+        f.type = o.optString("type", "other");
+        f.typeLabel = o.optString("typeLabel", "文件");
+        f.folder = o.optString("folder", "");
+        f.roomName = o.optString("roomName", "");
+        f.fromChat = o.optBoolean("fromChat", false);
+        f.rawUrl = o.optString("rawUrl", "");
+        f.thumbUrl = o.optString("thumbUrl", "");
+        f.downloadUrl = o.optString("downloadUrl", "");
+        f.createdAt = o.optLong("createdAt", 0);
+        f.deletedAt = o.optLong("deletedAt", 0);
+        f.expireAt = o.optLong("expireAt", 0);
+        f.remainDays = o.optInt("remainDays", 0);
+        f.isImage = "image".equals(f.type);
+        f.isVideo = "video".equals(f.type);
+        JSONObject s = o.optJSONObject("share");
+        if (s != null) f.share = parseShare(s);
+        return f;
+    }
+
+    private static ShareInfo parseShare(JSONObject o) {
+        ShareInfo s = new ShareInfo();
+        s.shareId = o.optString("shareId", "");
+        s.url = o.optString("url", "");
+        s.code = o.optString("code", "");
+        s.encrypted = o.optBoolean("encrypted", false);
+        s.expired = o.optBoolean("expired", false);
+        s.revoked = o.optBoolean("revoked", false);
+        s.needCode = o.optBoolean("needCode", false);
+        s.expireAt = o.optLong("expireAt", 0);
+        s.createdAt = o.optLong("createdAt", 0);
+        s.downloads = o.optInt("downloads", 0);
+        s.fileName = o.optString("fileName", "");
+        s.fileSizeText = o.optString("fileSizeText", "");
+        return s;
+    }
+
+    public DriveStorage driveStorage() throws ApiException {
+        JSONObject j = unwrap(get("/api/drive/storage"));
+        DriveStorage d = new DriveStorage();
+        d.used = j.optLong("used", 0);
+        d.quota = j.optLong("quota", 0);
+        d.remain = j.optLong("remain", 0);
+        d.usedText = j.optString("usedText", "");
+        d.quotaText = j.optString("quotaText", "");
+        d.remainText = j.optString("remainText", "");
+        d.percent = j.optInt("percent", 0);
+        d.fileCount = j.optInt("fileCount", 0);
+        d.trashCount = j.optInt("trashCount", 0);
+        return d;
+    }
+
+    /** folder: null = 全部目录，"" = 根目录 */
+    public DriveList driveFiles(String keyword, String type, String folder) throws ApiException {
+        StringBuilder p = new StringBuilder("/api/drive/files?size=100");
+        if (keyword != null && keyword.length() > 0) p.append("&keyword=").append(encode(keyword));
+        if (type != null && type.length() > 0) p.append("&type=").append(encode(type));
+        if (folder != null) p.append("&folder=").append(encode(folder));
+        JSONObject j = unwrap(get(p.toString()));
+        DriveList d = new DriveList();
+        d.total = j.optInt("total", 0);
+        d.page = j.optInt("page", 1);
+        d.pages = j.optInt("pages", 1);
+        d.hasMore = j.optBoolean("hasMore", false);
+        JSONArray arr = j.optJSONArray("items");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o != null) d.items.add(parseDriveFile(o));
+            }
+        }
+        JSONArray fs = j.optJSONArray("folders");
+        if (fs != null) {
+            for (int i = 0; i < fs.length(); i++) d.folders.add(fs.optString(i, ""));
+        }
+        return d;
+    }
+
+    public DriveList driveTrash() throws ApiException {
+        JSONObject j = unwrap(get("/api/drive/trash?size=100"));
+        DriveList d = new DriveList();
+        d.total = j.optInt("total", 0);
+        JSONArray arr = j.optJSONArray("items");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o != null) d.items.add(parseDriveFile(o));
+            }
+        }
+        return d;
+    }
+
+    public List<ShareInfo> driveShares() throws ApiException {
+        JSONObject j = unwrap(get("/api/drive/shares"));
+        List<ShareInfo> out = new ArrayList<ShareInfo>();
+        JSONArray arr = j.optJSONArray("items");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                ShareInfo s = parseShare(o);
+                s.shareId = o.optString("shareId", s.shareId);
+                s.fileName = o.optString("fileName", "");
+                s.fileSizeText = o.optString("fileSizeText", "");
+                out.add(s);
+            }
+        }
+        return out;
+    }
+
+    public void createFolder(String name) throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            req.put("name", name);
+            unwrap(postJson("/api/drive/folders", req));
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    public void deleteFolder(String name) throws ApiException {
+        unwrap(request("DELETE", "/api/drive/folders/" + encode(name), null, null));
+    }
+
+    public void patchDriveFile(String fileId, String name, String folder) throws ApiException {
+        JSONObject req = new JSONObject();
+        try {
+            if (name != null) req.put("name", name);
+            if (folder != null) req.put("folder", folder);
+        } catch (JSONException ignored) {
+        }
+        unwrap(request("PATCH", "/api/drive/files/" + fileId, utf8(req.toString()),
+                "application/json; charset=utf-8"));
+    }
+
+    public void trashFile(String fileId) throws ApiException {
+        unwrap(request("DELETE", "/api/drive/files/" + fileId, null, null));
+    }
+
+    public void restoreFile(String fileId) throws ApiException {
+        unwrap(postJson("/api/drive/trash/" + fileId + "/restore", new JSONObject()));
+    }
+
+    public void purgeFile(String fileId) throws ApiException {
+        unwrap(request("DELETE", "/api/drive/trash/" + fileId, null, null));
+    }
+
+    public ShareInfo shareFile(String fileId, int days, boolean encrypted, String code) throws ApiException {
+        try {
+            JSONObject req = new JSONObject();
+            req.put("days", days);
+            req.put("encrypted", encrypted);
+            if (code != null && code.length() > 0) req.put("code", code);
+            JSONObject j = unwrap(postJson("/api/drive/files/" + fileId + "/share", req));
+            return parseShare(j);
+        } catch (JSONException e) {
+            throw new ApiException("请求构造失败");
+        }
+    }
+
+    public void revokeShare(String shareId) throws ApiException {
+        unwrap(request("DELETE", "/api/drive/shares/" + shareId, null, null));
+    }
+
+    /* ================================================================ */
+    /* 皮肤                                                              */
+    /* ================================================================ */
+
+    public static class Skin {
+        public String id = "", name = "", description = "", style = "", tone = "", author = "";
+        public String preview = "", url = "";
+        public boolean builtin, mine, isPublic;
+    }
+
+    public List<Skin> skins() throws ApiException {
+        JSONObject j = unwrap(get("/api/skins"));
+        List<Skin> out = new ArrayList<Skin>();
+        JSONArray arr = j.optJSONArray("skins");
+        if (arr == null) arr = j.optJSONArray("items");
+        if (arr != null) {
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;
+                Skin s = new Skin();
+                s.id = o.optString("id", "");
+                s.name = o.optString("name", s.id);
+                s.description = o.optString("description", "");
+                s.style = o.optString("style", "");
+                s.tone = o.optString("tone", "");
+                s.author = o.optString("author", "");
+                s.preview = o.optString("preview", "");
+                s.url = o.optString("url", "");
+                s.builtin = o.optBoolean("builtin", false);
+                s.mine = o.optBoolean("mine", false);
+                s.isPublic = o.optBoolean("isPublic", false);
+                if (s.id.length() > 0) out.add(s);
+            }
+        }
+        return out;
+    }
+
+    /** 取皮肤入口 CSS（用于解析配色） */
+    public String skinCss(String urlPath) throws ApiException {
+        Resp r = get(urlPath);
+        if (r.status < 200 || r.status >= 300) throw new ApiException("皮肤下载失败（HTTP " + r.status + "）");
+        return r.body;
+    }
+
+    /* ================================================================ */
+    /* 下载辅助                                                          */
+    /* ================================================================ */
+
+    /** 供系统下载器带上网关会话 Cookie（CookieManager 里已有） */
+    public String cookieHeader() {
+        try {
+            CookieHandler h = CookieHandler.getDefault();
+            if (!(h instanceof CookieManager)) return "";
+            java.net.CookieStore st = ((CookieManager) h).getCookieStore();
+            java.util.List<java.net.HttpCookie> cs = st.get(new java.net.URI(base));
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < cs.size(); i++) {
+                if (sb.length() > 0) sb.append("; ");
+                sb.append(cs.get(i).getName()).append('=').append(cs.get(i).getValue());
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private static byte[] utf8(String s) {
+        try {
+            return s.getBytes("utf-8");
+        } catch (Exception e) {
+            return s.getBytes();
+        }
+    }
+
+    /** 上传到网盘（roomId 为空即网盘文件），完成后落到指定目录 */
+    public String uploadDrive(File file, String folder, Progress cb) throws ApiException {
+        String id = uploadTo(file, "", cb);
+        if (folder != null && folder.length() > 0) {
+            patchDriveFile(id, null, folder);
+        }
+        return id;
     }
 
     /** 把输入流转成字符串（小工具） */

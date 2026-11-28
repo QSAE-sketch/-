@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 与站点 / Windows 原生端同一套配色 -->
-    <color name="brand">#FF1F6FEB</color>
-    <color name="brand_dark">#FF175FCD</color>
-    <color name="brand_light">#FFE2EEFF</color>
+    <color name="brand">#FF3B82F6</color>
+    <color name="brand_dark">#FF2A5FCF</color>
+    <color name="brand_light">#FF1B3157</color>
 
-    <color name="window_bg">#FFFFFFFF</color>
-    <color name="bg">#FFF2F3F5</color>
-    <color name="card">#FFFFFFFF</color>
-    <color name="line">#FFE5E6EB</color>
-    <color name="text">#FF1F2328</color>
-    <color name="sub">#FF6E7681</color>
-    <color name="muted">#FF969EA8</color>
-    <color name="field">#FFF7F8FA</color>
+    <color name="window_bg">#FF0C1522</color>
+    <color name="bg">#FF0C1522</color>
+    <color name="card">#FF16233A</color>
+    <color name="line">#FF22314A</color>
+    <color name="text">#FFE8EFFA</color>
+    <color name="sub">#FFA6B8D2</color>
+    <color name="muted">#FF7C8FAC</color>
+    <color name="field">#FF1B2A45</color>
     <color name="danger">#FFD73A49</color>
 
     <!-- 启动闪屏底色，保留兼容 -->
-    <color name="web_bg">#FFFFFFFF</color>
+    <color name="web_bg">#FF0C1522</color>
     <color name="ic_launcher_background">#FF262626</color>
 </resources>

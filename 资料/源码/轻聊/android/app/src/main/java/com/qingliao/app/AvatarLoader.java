@@ -39,8 +39,6 @@ public class AvatarLoader {
         void onLoaded(String path, Bitmap bmp);
     }
 
-    private static final int MAX_BYTES = 2 * 1024 * 1024;   // 头像图不会超过这个量级
-
     private final LruCache<String, Bitmap> cache;
     private final Set<String> failed = Collections.synchronizedSet(new HashSet<String>());
     private final Set<String> loading = Collections.synchronizedSet(new HashSet<String>());
@@ -48,9 +46,20 @@ public class AvatarLoader {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Api api;
     private final int targetPx;
+    private final boolean crop;
+    private final int maxBytes;
 
     public AvatarLoader(Api api, int targetPx) {
+        this(api, targetPx, true);
+    }
+
+    /**
+     * @param crop true=裁圆（头像）；false=原样缩放（聊天里的图片）
+     */
+    public AvatarLoader(Api api, int targetPx, boolean crop) {
         this.api = api;
+        this.crop = crop;
+        this.maxBytes = crop ? 2 * 1024 * 1024 : 8 * 1024 * 1024;
         this.targetPx = targetPx < 24 ? 96 : targetPx;
         // 内存缓存上限按像素估算：约 4MB，够放几百张小头像
         int kb = (int) (Runtime.getRuntime().maxMemory() / 1024);
@@ -126,7 +135,7 @@ public class AvatarLoader {
             int n, total = 0;
             while ((n = is.read(buf)) > 0) {
                 total += n;
-                if (total > MAX_BYTES) { is.close(); return null; }
+                if (total > maxBytes) { is.close(); return null; }
                 bos.write(buf, 0, n);
             }
             is.close();
@@ -145,7 +154,7 @@ public class AvatarLoader {
             opt2.inSampleSize = scale;
             opt2.inPreferredConfig = Bitmap.Config.ARGB_8888;
             Bitmap raw = BitmapFactory.decodeByteArray(data, 0, data.length, opt2);
-            return raw == null ? null : circleCrop(raw);
+            return raw == null ? null : (crop ? circleCrop(raw) : raw);
         } catch (Throwable t) {
             return null;
         } finally {

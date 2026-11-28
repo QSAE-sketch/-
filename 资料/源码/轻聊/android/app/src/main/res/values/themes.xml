@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Android 4.4（API 19）基础主题 -->
-    <style name="AppTheme" parent="@android:style/Theme.Holo.Light.NoActionBar">
+    <!-- Android 5.0.2（API 21）起可用 Material 主题；界面全部代码绘制，这里只控制窗口层 -->
+    <style name="AppTheme" parent="@android:style/Theme.Material.NoActionBar">
         <item name="android:windowBackground">@color/window_bg</item>
+        <item name="android:colorAccent">@color/brand</item>
     </style>
 </resources>
