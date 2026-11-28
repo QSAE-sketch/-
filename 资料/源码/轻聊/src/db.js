@@ -420,6 +420,20 @@ function meta(ns, doc) {
     case 'shares':
       return { k1: doc.userId, k2: doc.fileId };
     /*
+     * 反馈箱（照天线 OPENWIRE 的反馈体系，2026-11-28 合规补强）：
+     * type: bug（问题反馈）/ idea（功能建议）/ complaint（投诉举报，可带 refMessageId 引用被举报消息）
+     * k1=type，k2=userId（「我的反馈」列表）。
+     */
+    case 'feedback':
+      return { k1: doc.type, k2: doc.userId };
+    /*
+     * 内容审查单（图片小模型审核 + 举报处置，2026-11-28 合规补强）：
+     * kind=image（2h 窗口，期间图片不可查看）/ report（12h 窗口，消息可见、文件禁下载）
+     * k1=status（官方待处理列表），k2=targetId（按消息/文件/用户查挂起状态）。
+     */
+    case 'reviews':
+      return { k1: doc.status, k2: String(doc.fileId || doc.messageId || doc.targetId || doc.userId || '') };
+    /*
      * 网盘目录：文件夹是「空目录也能存在」的实体，所以单独存一条记录。
      * 目录里有什么文件仍以 files.folder 为准（不冗余成员关系，移动文件即改 folder）。
      */

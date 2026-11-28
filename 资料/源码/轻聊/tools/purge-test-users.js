@@ -12,7 +12,7 @@ const PERM_KEY = 'lz-qingliao-2026';
 const APPLY = process.argv.includes('--apply');
 
 // 按用户名精确匹配（ID 在日志里是截断的，不足为凭）
-const KEEP = new Set(['刘子墨', 'L18971035559', '刘子墨__小号']);
+const KEEP = new Set(['刘子墨', 'L18971035559', '刘子墨__小号', 'L13902499337']);
 
 const CFG = {
   endpoint: BASE,

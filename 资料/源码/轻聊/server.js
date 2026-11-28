@@ -154,6 +154,20 @@ const db = createDb(store);
 const localBlobs = new LocalBlobStore(UPLOAD_DIR);
 const files = new FileStore(UPLOAD_DIR, db, localBlobs);
 
+/* ---------------- 内容审查（合规补强 · 2026-11-28） ----------------
+ * 图片：先发后审（nsfwjs 服务器端推理），扫描中与疑似违规待处置期间不可查看，
+ *       疑似违规上报官方 2h，超时自动删。
+ * 举报：被举报内容 12h 观察期，消息可查看、文件不可下载，超时自动删。
+ * 审查单状态机在 src/reviews.js，模型推理在 src/image-moderation.js。
+ */
+const { createReviews, IMAGE_WINDOW_MS, REPORT_WINDOW_MS } = require('./src/reviews');
+const reviews = createReviews(db);
+const { createImageModeration } = require('./src/image-moderation');
+const imageModeration = createImageModeration(reviews);
+/** 审查到期清扫间隔（默认 1 分钟，测试可调快） */
+const REVIEW_SWEEP_MS = Number(process.env.REVIEW_SWEEP_MS) > 0
+  ? Number(process.env.REVIEW_SWEEP_MS) : 60 * 1000;
+
 // 记录已通过密码校验的（token, roomId）
 const roomPassCache = new Map();
 
@@ -769,6 +783,13 @@ route('POST', '/api/me/avatar', async (req, res, ctx) => {
   ctx.user.avatarMime = sig.mime;
   ctx.user.avatarV = now();
   db.put('users', ctx.user);
+  // 图片小模型审核：头像上传后入队扫描；扫描/待官方处置期间对外显示默认头像，
+  // 官方 2 小时不处理 → 自动删除头像恢复默认（见 reviews.sweep）
+  imageModeration.enqueue({
+    targetType: 'avatar',
+    userId: ctx.user.id,
+    readBytes: async () => buf
+  });
   ok(res, { user: publicUser(ctx.user) });
 });
 
@@ -789,6 +810,8 @@ route('DELETE', '/api/me/avatar', async (req, res, ctx) => {
 route('GET', '/api/avatars/:id', async (req, res, ctx) => {
   const u = db.getUser(ctx.params.id);
   if (!u || !u.avatar) return fail(res, 404, '头像不存在');
+  // 图片审核中（小模型扫描 / 疑似违规待官方处置）：不返回头像，前端回退默认色块
+  if (reviews.avatarBlocked(u.id)) return fail(res, 404, '头像不存在');
   const file = path.join(AVATAR_DIR, u.id + '.' + u.avatar);
   let buf;
   try {
@@ -904,6 +927,232 @@ async function purgeAccount(userId) {
   db.del('users', userId);
   return stats;
 }
+
+/* ---------------- 内容审查：举报 / 反馈箱 / 官方处置 ----------------
+ *
+ * 举报规则（官方 2026-11-28 定案）：
+ *  - 被举报内容进入 12 小时观察期：期间消息可查看，文件不可下载
+ *  - 官方处理：keep=确认无问题 / delete=确认违规删除
+ *  - 官方 12 小时不处理 → 自动删除
+ * 图片审核规则：
+ *  - 发出即入队小模型扫描，扫描中与疑似违规待处置期间图片不可查看
+ *  - 疑似违规上报官方 2 小时，不处理 → 自动删除
+ */
+
+/** 审查超时「自动删除图片」执行体：删字节 + 清消息 / 清头像 */
+async function purgeReviewImage(r) {
+  if (r.targetType === 'avatar' && r.userId) {
+    // 头像超时删：恢复默认色块头像
+    const u = db.getUser(r.userId);
+    if (u && u.avatar) {
+      const old = path.join(AVATAR_DIR, u.id + '.' + u.avatar);
+      try { if (fs.existsSync(old)) fs.unlinkSync(old); } catch (_) { /* 忽略 */ }
+      delete u.avatar;
+      delete u.avatarMime;
+      u.avatarV = now();
+      db.put('users', u);
+    }
+    return;
+  }
+  // 消息图片超时删：图片字节 + 消息一起清（复用 purgeMessage 的跨端同步语义）
+  const m = r.messageId ? db.getMessage(r.messageId) : null;
+  if (m && !m.purged) await purgeMessage(m);
+}
+
+/** 审查超时/官方确认「删除被举报内容」执行体 */
+async function purgeReportTarget(r) {
+  if (r.targetType === 'message') {
+    const m = db.getMessage(r.targetId);
+    if (m && !m.purged) await purgeMessage(m);
+    return;
+  }
+  if (r.targetType === 'file') {
+    const f = db.getFile(r.targetId);
+    if (f) {
+      await files.removeBlob(f.id).catch(() => {});
+      db.del('files', f.id);
+    }
+    // 顺带清掉聊天里引用这个文件的消息（文件没了，空气泡留着没有意义）
+    for (const m of db.list('messages')) {
+      if (m.fileId === r.targetId && !m.purged) await purgeMessage(m);
+    }
+    return;
+  }
+}
+
+/**
+ * 提交举报（登录用户）。
+ * body: { targetKind: 'message'|'file', targetId, reason }
+ *  - 同时创建反馈箱条目（type=complaint）+ 审查单（12h 观察期）
+ *  - 被举报内容立即可被官方在待处理列表看到
+ */
+route('POST', '/api/reports', async (req, res, ctx) => {
+  const b = await readJson(req);
+  const targetKind = b.targetKind === 'file' ? 'file' : 'message';
+  const targetId = String(b.targetId || '');
+  if (!targetId) return fail(res, 400, '缺少举报目标');
+  const reason = String(b.reason || '').trim();
+  if (!reason) return fail(res, 400, '请填写举报理由');
+
+  const target = targetKind === 'message' ? db.getMessage(targetId) : db.getFile(targetId);
+  if (!target) return fail(res, 404, '举报的内容不存在');
+
+  // 同一内容被同一人重复举报：直接返回已有审查单（防刷）
+  const dup = db.list('reviews').find((r) =>
+    r.kind === 'report' && r.targetId === targetId &&
+    (r.status === 'pending' || r.status === 'scanning'));
+  if (dup) return ok(res, { reviewId: dup.id, duplicated: true, deadline: dup.deadline });
+
+  // 反馈箱条目（官方在反馈箱里能看到这次举报）
+  const fb = db.put('feedback', {
+    id: randomId('fb_'),
+    type: 'complaint',
+    userId: ctx.user.id,
+    title: '举报' + (targetKind === 'message' ? '消息' : '文件'),
+    content: reason.slice(0, 2000),
+    refId: targetId,
+    refKind: targetKind,
+    status: 'open',
+    reply: null,
+    createdAt: now()
+  });
+
+  const rv = reviews.createReportReview({
+    targetKind,
+    targetId,
+    roomId: target.roomId || null,
+    reason,
+    reporterId: ctx.user.id,
+    feedbackId: fb.id
+  });
+  console.log('[reviews] 收到举报: review=' + rv.id + ' ' + targetKind + '=' + targetId +
+    ' by=' + ctx.user.username + ' reason=' + reason.slice(0, 50));
+  ok(res, { reviewId: rv.id, feedbackId: fb.id, deadline: rv.deadline });
+});
+
+/* ---------------- 反馈箱（问题反馈 / 功能建议） ---------------- */
+
+/** 提交反馈：type = bug(问题反馈) / idea(功能建议) */
+route('POST', '/api/feedback', async (req, res, ctx) => {
+  const b = await readJson(req);
+  const type = ['bug', 'idea'].indexOf(b.type) !== -1 ? b.type : 'bug';
+  const title = String(b.title || '').trim();
+  const content = String(b.content || '').trim();
+  if (!title) return fail(res, 400, '请填写标题');
+  if (title.length > 100) return fail(res, 400, '标题最长 100 字');
+  if (!content) return fail(res, 400, '请填写内容');
+  if (content.length > 2000) return fail(res, 400, '内容最长 2000 字');
+  const fb = db.put('feedback', {
+    id: randomId('fb_'),
+    type,
+    userId: ctx.user.id,
+    title,
+    content,
+    refId: null,
+    refKind: null,
+    status: 'open',
+    reply: null,
+    createdAt: now()
+  });
+  ok(res, { feedback: fb });
+});
+
+/** 我的反馈（含官方回复与未读状态） */
+route('GET', '/api/feedback/mine', async (req, res, ctx) => {
+  const list = db.byIdx('feedback', 'k2', ctx.user.id);
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  ok(res, { feedback: list });
+});
+
+/** 官方：全部反馈（含举报单关联的 complaint） */
+route('GET', '/api/feedback', async (req, res, ctx) => {
+  if (!requireMaster(res, ctx.user)) return;
+  const list = db.list('feedback');
+  list.sort((a, b) => b.createdAt - a.createdAt);
+  ok(res, { feedback: list, open: list.filter((f) => f.status === 'open').length });
+});
+
+/** 官方回复反馈（回复后状态变已回复） */
+route('POST', '/api/feedback/:id/reply', async (req, res, ctx) => {
+  if (!requireMaster(res, ctx.user)) return;
+  const fb = db.get('feedback', ctx.params.id);
+  if (!fb) return fail(res, 404, '反馈不存在');
+  const b = await readJson(req);
+  const reply = String(b.reply || '').trim();
+  if (!reply) return fail(res, 400, '回复内容不能为空');
+  fb.reply = reply.slice(0, 2000);
+  fb.repliedAt = now();
+  fb.repliedBy = ctx.user.id;
+  fb.status = 'replied';
+  db.put('feedback', fb);
+  ok(res, { feedback: fb });
+});
+
+/** 反馈已读（用户看过官方回复后清除未读提示） */
+route('POST', '/api/feedback/:id/seen', async (req, res, ctx) => {
+  const fb = db.get('feedback', ctx.params.id);
+  if (!fb || fb.userId !== ctx.user.id) return fail(res, 404, '反馈不存在');
+  fb.seenAt = now();
+  db.put('feedback', fb);
+  ok(res, { ok: true });
+});
+
+/* ---------------- 官方：审查处置 ---------------- */
+
+/** 官方待处理列表：图片审核 + 举报，按创建时间正序 */
+route('GET', '/api/reviews', async (req, res, ctx) => {
+  if (!requireMaster(res, ctx.user)) return;
+  const list = reviews.pendingList().map((r) => {
+    const s = reviews.summary(r);
+    // 挂上目标内容快照，官方不用自己再去查
+    if (r.messageId) {
+      const m = db.getMessage(r.messageId);
+      if (m) s.message = {
+        id: m.id, roomId: m.roomId, kind: m.kind, content: m.content,
+        senderName: roomDisplayName(m.roomId, m.senderId), createdAt: m.createdAt
+      };
+    }
+    if (r.fileId) {
+      const f = db.getFile(r.fileId);
+      if (f) s.file = { id: f.id, name: f.name, size: f.size, mime: f.mime, url: null };
+    }
+    if (r.kind === 'report' && r.targetType === 'file') {
+      const f = db.getFile(r.targetId);
+      if (f) s.targetFile = { id: f.id, name: f.name, size: f.size, mime: f.mime };
+    }
+    if (r.kind === 'report' && r.targetType === 'message') {
+      const m = db.getMessage(r.targetId);
+      if (m) s.targetMessage = {
+        id: m.id, roomId: m.roomId, kind: m.kind, content: m.content,
+        senderName: roomDisplayName(m.roomId, m.senderId), createdAt: m.createdAt
+      };
+    }
+    return s;
+  });
+  ok(res, { reviews: list, moderation: imageModeration.info() });
+});
+
+/**
+ * 官方处置：action = keep(确认无害，恢复可见) / delete(确认违规，立即删除)
+ * 图片审核单：keep → 图片恢复可见；delete → 删图删消息
+ * 举报单：keep → 内容恢复正常；delete → 删除被举报内容
+ */
+route('POST', '/api/reviews/:id/handle', async (req, res, ctx) => {
+  if (!requireMaster(res, ctx.user)) return;
+  const rv = reviews.get(ctx.params.id);
+  if (!rv) return fail(res, 404, '审查单不存在');
+  if (rv.status === 'handled') return fail(res, 400, '该审查单已处理');
+  const b = await readJson(req);
+  const action = b.action;
+  reviews.handle(rv, action, ctx.user);
+  if (action === 'delete') {
+    if (rv.kind === 'image') await purgeReviewImage(rv);
+    else await purgeReportTarget(rv);
+  }
+  console.log('[reviews] 官方处置: review=' + rv.id + ' action=' + action +
+    (rv.autoPurged ? '' : ' by=' + ctx.user.username));
+  ok(res, { review: reviews.summary(rv) });
+});
 
 /* ---------------- 最高权限：管理接口 ---------------- */
 
@@ -1412,19 +1661,30 @@ function decorateMessage(m, viewer, room) {
   if (m.fileId) {
     const f = db.getFile(m.fileId);
     if (f) {
+      // 内容审查状态（2026-11-28 合规补强）：
+      //  - 图片审核 scanning/pending → url 置空，前端渲染「图片审核中」占位
+      //  - 被举报（12h 观察期）→ 消息本体可见，文件不可下载（下载链接置空）
+      const imgReview = reviews.fileBlocked(f.id);
+      const reported = imgReview && imgReview.kind === 'report';
+      const reviewing = imgReview && imgReview.kind === 'image';
+      const dead = !!f.deletedAt;
       out.file = {
         id: f.id,
         name: f.name,
         size: f.size,
         mime: f.mime,
         state: f.state,
-        url: '/api/files/' + f.id + '/raw?k=' + encodeURIComponent(f.accessToken),
+        url: (reviewing || dead) ? null : '/api/files/' + f.id + '/raw?k=' + encodeURIComponent(f.accessToken),
         // 强制 attachment 的下载入口（浏览器/客户端存盘用）
-        dlUrl: '/api/files/' + f.id + '/download?k=' + encodeURIComponent(f.accessToken),
+        dlUrl: (imgReview || dead) ? null : '/api/files/' + f.id + '/download?k=' + encodeURIComponent(f.accessToken),
         isImage: /^image\//i.test(f.mime),
         isVideo: /^video\//i.test(f.mime),
         // 已移入网盘回收站：聊天里仍保留这条消息，但不再提供预览与下载
-        deleted: !!f.deletedAt
+        deleted: dead,
+        // 图片审核中（不可查看）/ 被举报挂起（消息可见、文件禁下载）
+        reviewing,
+        reported: !!reported,
+        reportedRemainMs: reported ? Math.max(0, (imgReview.deadline || 0) - now()) : null
       };
     }
   }
@@ -1459,6 +1719,20 @@ route('POST', '/api/rooms/:id/messages', async (req, res, ctx) => {
   }
 
   const msg = db.createMessage(room.id, ctx.user.id, { kind, content, fileId });
+  // 图片小模型审核：图片消息发出后入队扫描（先发后审）。
+  // 扫描中 / 疑似违规待官方处置（2h）期间，图片字节对所有人不可查看
+  // （guardFileAccess 拦截）；官方 2 小时不处理 → reviews.sweep 自动删图+清消息。
+  if (kind === 'file' && fileId && db.getFile(fileId) &&
+      /^image\//i.test(db.getFile(fileId).mime || '')) {
+    imageModeration.enqueue({
+      targetType: 'message-image',
+      fileId,
+      messageId: msg.id,
+      roomId: room.id,
+      userId: ctx.user.id,
+      readBytes: () => files.readAll(fileId)
+    });
+  }
   ok(res, { message: decorateMessage(msg, ctx.user, room) });
 });
 
@@ -1726,13 +2000,34 @@ route('DELETE', '/api/files/:id', async (req, res, ctx) => {
  * 独立访问令牌 ?k=（供 <img>/<video> 直连）或登录态均可访问。
  * @returns {boolean} 是否放行（不放行时已写过响应）
  */
-function guardFileAccess(res, ctx, f) {
+/**
+ * 文件访问校验（/raw 与 /download 共用，保证两条路径权限完全一致）。
+ * 独立访问令牌 ?k=（供 <img>/<video> 直连）或登录态均可访问。
+ * @param mode 'raw' 预览查看 / 'download' 强制下载 —— 内容审查按此区分放行
+ * @returns {boolean} 是否放行（不放行时已写过响应）
+ */
+function guardFileAccess(res, ctx, f, mode) {
   const k = ctx.url.searchParams.get('k');
   const byKey = !!(k && k === f.accessToken);
   // 已移入网盘回收站：任何入口都不再放行（分享链接同样失效）
   if (f.deletedAt) {
     fail(res, 404, '文件已被删除');
     return false;
+  }
+  // 内容审查拦截（即使带访问令牌也拦——审查单对所有访问入口生效）：
+  //  - 图片审核 scanning/pending：图片不可被任何人查看（raw/download 全拦）
+  //  - 被举报（12h 观察期）：内容可查看（raw 放行），但文件不可下载（download 拦）
+  const blocked = reviews.fileBlocked(f.id);
+  if (blocked) {
+    if (blocked.kind === 'image') {
+      fail(res, 403, '图片审核中，暂时无法查看');
+      return false;
+    }
+    if (mode === 'download') {
+      fail(res, 403, '内容已被举报，待官方核实，暂时无法下载');
+      return false;
+    }
+    // 举报观察期内的预览（raw）放行：消息可查看
   }
   if (byKey) return true;
   if (!ctx.user) {
@@ -1755,7 +2050,7 @@ route('GET', '/api/files/:id/raw', async (req, res, ctx) => {
   const f = db.getFile(ctx.params.id);
   if (!f) return fail(res, 404, '文件不存在');
   if (f.state !== 'ready') return fail(res, 404, '文件不存在');
-  if (!guardFileAccess(res, ctx, f)) return;
+  if (!guardFileAccess(res, ctx, f, 'raw')) return;
   const sent = await files.stream(req, res, f.id);
   if (!sent) fail(res, 404, '文件不存在');
 }, false);
@@ -1770,7 +2065,7 @@ route('GET', '/api/files/:id/download', async (req, res, ctx) => {
   const f = db.getFile(ctx.params.id);
   if (!f) return fail(res, 404, '文件不存在');
   if (f.state !== 'ready') return fail(res, 404, '文件不存在');
-  if (!guardFileAccess(res, ctx, f)) return;
+  if (!guardFileAccess(res, ctx, f, 'download')) return;
   // 中文名走 RFC 5987，同时给一个 ASCII 兜底名
   const ascii = String(f.name || 'download')
     .replace(/[^\x20-\x7e]/g, '_')
@@ -1792,7 +2087,7 @@ route('GET', '/api/files/:id/download', async (req, res, ctx) => {
  * 所以「聊天里发过的文件」天然出现在网盘里，不需要任何同步动作。
  */
 const drive = require('./src/drive')({
-  route, db, files, perm, ok, fail, readJson, now, fmtSize, storageInfo, clampInt
+  route, db, files, perm, ok, fail, readJson, now, fmtSize, storageInfo, clampInt, reviews
 });
 
 /* ---------------- 皮肤系统（标准版） ----------------
@@ -2589,11 +2884,31 @@ initStore().then(() => {
         console.error('[chatapp] 回收站定时清理失败: ' + (e && e.message ? e.message : e));
       });
     }, 60 * 60 * 1000).unref();
+
+    // 内容审查到期清扫：图片审核 2h / 举报 12h 到期官方未处理 → 自动删除
+    // （启动一次 + 每分钟一次，卡死的 scanning 单由 sweep 兜底转 pending）
+    reviewsSweep().catch((e) => {
+      console.error('[chatapp] 审查清扫失败: ' + (e && e.message ? e.message : e));
+    });
+    setInterval(() => {
+      reviewsSweep().catch((e) => {
+        console.error('[chatapp] 审查定时清扫失败: ' + (e && e.message ? e.message : e));
+      });
+    }, REVIEW_SWEEP_MS).unref();
   });
 }).catch((e) => {
   console.error('[chatapp] 启动失败: ' + (e && e.message ? e.message : e));
   process.exit(1);
 });
+
+/** 内容审查到期清扫执行体：注入 purge 钩子后跑状态机 */
+async function reviewsSweep() {
+  const n = reviews.sweep({
+    purgeImage: (r) => purgeReviewImage(r),
+    purgeTarget: (r) => purgeReportTarget(r)
+  });
+  if (n > 0) console.log('[reviews] 到期自动删除 ' + n + ' 条（官方未按时处置）');
+}
 
 for (const sig of ['SIGINT', 'SIGTERM']) {
   process.on(sig, async () => {

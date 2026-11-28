@@ -38,6 +38,7 @@ const TESTS = [
   'test/limits.js',
   'test/avatar.js',
   'test/room-search.js',
+  'test/reviews.js',
   'test/skins.js',
   'test/ui.js'
 ];

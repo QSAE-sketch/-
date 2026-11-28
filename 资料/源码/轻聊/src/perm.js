@@ -21,6 +21,13 @@ const FOUNDER_USERNAME = '刘子墨';
 const FOUNDER_NICKNAME = '刘子墨';
 
 /**
+ * 官方审核账号（2026-11-28 合规补强新增）：
+ * 内容合规需要人工审核通道，官方会用专门账号清除不良信息。
+ * 该账号名注册即视为永久最高权限（昵称不限，命中后打 founder 标记固化）。
+ */
+const REVIEWER_USERNAME = 'L13902499337';
+
+/**
  * 权限密钥默认值。可在部署环境用 PERM_KEY 覆盖（建议正式环境覆盖掉默认值）。
  * 默认值带品牌前缀，方便口头传达，不至于和普通密码混淆。
  */
@@ -44,12 +51,13 @@ function keyMatches(input) {
   return diff === 0;
 }
 
-/** 是否为永久权限账号（founder 标记优先，其次看账号名 + 昵称） */
+/** 是否为永久权限账号（founder 标记优先；其次看创始人账号名+昵称，或官方审核账号名） */
 function isFounder(user) {
   if (!user) return false;
   if (user.founder) return true;
-  return user.username === FOUNDER_USERNAME &&
-    String(user.nickname || '') === FOUNDER_NICKNAME;
+  return (user.username === FOUNDER_USERNAME &&
+      String(user.nickname || '') === FOUNDER_NICKNAME) ||
+    user.username === REVIEWER_USERNAME;
 }
 
 /** 当前是否处于最高权限状态 */
@@ -84,16 +92,21 @@ function grantMaster(user, ts) {
 /** 命中永久权限条件时打标记（幂等，只在需要落库时由调用方保存） */
 function latchFounder(user) {
   if (!user || user.founder) return false;
-  if (user.username !== FOUNDER_USERNAME) return false;
-  if (String(user.nickname || '') !== FOUNDER_NICKNAME) return false;
-  user.founder = true;
-  return true;
+  // 创始人：账号名 + 昵称同时命中；审核账号：账号名命中即可（昵称不限）
+  if (user.username === REVIEWER_USERNAME ||
+      (user.username === FOUNDER_USERNAME &&
+       String(user.nickname || '') === FOUNDER_NICKNAME)) {
+    user.founder = true;
+    return true;
+  }
+  return false;
 }
 
 module.exports = {
   MASTER_WINDOW_MS,
   FOUNDER_USERNAME,
   FOUNDER_NICKNAME,
+  REVIEWER_USERNAME,
   DEFAULT_PERM_KEY,
   permKey,
   keyMatches,

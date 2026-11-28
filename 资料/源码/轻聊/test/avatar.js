@@ -80,9 +80,18 @@ const user = { username: uniq, password: 'pass1234', nickname: '头像测试' };
   const avUrl = up.json && up.json.user && up.json.user.avatar;
   check('avatar 地址带 ?v= 缓存戳', /\/api\/avatars\/[^?]+\?v=\d+/.test(avUrl || ''), avUrl);
 
-  // 取图
-  const got = await req('GET', avUrl || '/api/avatars/none');
-  check('GET 头像返回 200', got.status === 200, got.status);
+  // 图片审核（2026-11-28 合规补强）：上传即入队 nsfwjs 扫描，
+  // scanning 期间头像对外 404（前端回退默认色块）→ clean 后恢复 200。
+  let got = null;
+  let sawBlocked = false;
+  for (let i = 0; i < 40; i++) {
+    got = await req('GET', avUrl || '/api/avatars/none');
+    if (got.status === 200) break;
+    if (got.status === 404) sawBlocked = true;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  check('GET 头像最终返回 200（扫描完成恢复）', got.status === 200, got.status);
+  if (sawBlocked) console.log('  - 实测到审核窗口：上传后短暂 404，clean 后恢复 ✓');
   check('头像字节是 PNG', got.body.length > 8 && got.body[0] === 0x89 && got.body[1] === 0x50,
     got.body.slice(0, 4));
   check('带 v 的头像可长缓存',

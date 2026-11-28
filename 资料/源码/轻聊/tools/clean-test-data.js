@@ -9,17 +9,30 @@ const APPLY = process.argv.indexOf('--apply') >= 0;
 const { CloudStore } = require('../src/cloud');
 
 // ===== 真实数据白名单 =====
-const REAL_USERS = new Set([
+// ID 名单 + 用户名名单（用户名名单会在启动时动态解析成 ID，
+// 这样新注册的受保护账号（如官方审核账号）无需手工补 ID 即自动受保护）
+const REAL_USER_IDS = new Set([
   'u_4b055774cb1435a48b86213b',   // 刘子墨（founder）
-  'u_54fc13d39772fb635f0b247e'    // L18971035559 爱吃榴莲的蘑菇
+  'u_54fc13d39772fb635f0b247e',   // L18971035559 爱吃榴莲的蘑菇
 ]);
+const REAL_USERNAMES = new Set(['刘子墨', 'L18971035559', 'L13902499337']); // L13902499337 = 官方审核账号，绝不可清理
 const REAL_ROOMS = new Set([
   'r_86064996929b51073b7efedc'    // 公共聊天室
 ]);
+const REAL_USERS = new Set(REAL_USER_IDS);  // 动态解析后补全
 
 (async () => {
   const cs = new CloudStore();
   await cs.load();
+  // 先扫一遍 users，把用户名命中的账号 ID 动态补进白名单
+  cs.mem.forEach((b, ns) => {
+    if (ns !== 'users') return;
+    b.forEach((rec, id) => {
+      const d = rec && rec.doc ? rec.doc : rec;
+      if (d && REAL_USERNAMES.has(d.username)) REAL_USERS.add(id);
+    });
+  });
+
   const entries = [];
   cs.mem.forEach((b, ns) => b.forEach((rec, id) => entries.push({ ns, id, doc: rec && rec.doc ? rec.doc : rec })));
   const D = doc => doc && doc.doc ? doc.doc : doc;

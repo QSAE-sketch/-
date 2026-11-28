@@ -63,7 +63,8 @@ function md5Of(buf) {
 module.exports = function registerDrive(deps) {
   const {
     route, db, files, perm,
-    ok, fail, readJson, now, fmtSize, storageInfo, clampInt
+    ok, fail, readJson, now, fmtSize, storageInfo, clampInt,
+    reviews   // 内容审查单（2026-11-28）：审核中/被举报的文件禁止经分享链接绕过下载
   } = deps;
 
   /* ================================================================ */
@@ -544,6 +545,11 @@ module.exports = function registerDrive(deps) {
     const code = String(ctx.url.searchParams.get('code') || '');
     if (s.encrypted && code.toLowerCase() !== String(s.code || '').toLowerCase()) {
       return fail(res, 403, '提取码不正确');
+    }
+    // 内容审查：图片审核中不可查看；被举报文件 12h 观察期内不可下载
+    // （分享链接不能成为绕过审查的下载通道）
+    if (reviews && reviews.fileBlocked(f.id)) {
+      return fail(res, 403, '内容审核中，暂时无法访问');
     }
 
     s.downloads = (s.downloads || 0) + 1;
