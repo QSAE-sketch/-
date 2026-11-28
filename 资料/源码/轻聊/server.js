@@ -2875,6 +2875,15 @@ initStore().then(() => {
       });
     }, 30 * 60 * 1000).unref();
 
+    // 自动创建「Bug 反馈」公共房间（若不存在）
+    const bugRooms = db.byIdx('rooms', 'k1', ROOM_PUBLIC).filter((r) => r.name === 'Bug 反馈');
+    if (!bugRooms.length) {
+      const bugRoom = db.createRoom(ROOM_PUBLIC, 'Bug 反馈', null, null);
+      bugRoom.kind = ROOM_PUBLIC;
+      db.put('rooms', bugRoom);
+      console.log('[chatapp] 自动创建 Bug 反馈房间: ' + bugRoom.id);
+    }
+
     // 网盘回收站：软删除 30 天后物理清除（启动一次 + 每小时一次）
     drive.purgeTrash().catch((e) => {
       console.error('[chatapp] 回收站清理失败: ' + (e && e.message ? e.message : e));

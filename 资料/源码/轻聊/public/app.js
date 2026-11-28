@@ -1375,7 +1375,8 @@
       for (var j = 0; j < mine.length; j++) {
         var r = mine[j];
         h += '<div class="row" data-open="' + r.id + '"><div class="r-main">' +
-          '<div class="r-title">🏠 ' + esc(r.name) +
+          '<div class="r-title">' + esc(r.name) +
+          (r.name === 'Bug 反馈' ? '<span class="badge ok">官方</span>' : '') +
           (r.hasPassword ? '<span class="badge warn">密码</span>' : '<span class="badge gray">免密</span>') +
           (r.role ? '<span class="badge">' + esc(r.roleName) + '</span>' : '') +
           (r.dissolved ? '<span class="badge warn">已解散</span>' : '') + '</div>' +
@@ -1390,7 +1391,8 @@
     else {
       for (var m = 0; m < others.length; m++) {
         var o = others[m];
-        h += '<div class="row"><div class="r-main"><div class="r-title">🏠 ' + esc(o.name) +
+        h += '<div class="row"><div class="r-main"><div class="r-title">' + esc(o.name) +
+          (o.name === 'Bug 反馈' ? '<span class="badge ok">官方</span>' : '') +
           (o.hasPassword ? '<span class="badge warn">密码</span>' : '<span class="badge gray">免密</span>') + '</div>' +
           '<div class="r-sub">' + o.memberCount + ' 人</div></div>' +
           '<button class="btn small primary" data-join="' + o.id + '">加入</button></div>';
@@ -1790,7 +1792,6 @@
       '· 删除 = 仅对自己隐藏；撤回 = 发送者 2 分钟内，彻底移除<br>' +
       '· 直接删除 = 无时间限制，服务器端彻底清除，所有设备同步消失</div></div>';
     h += '<div class="card"><div class="act" id="viewChangelog">📜 历史更新记录 · 查看每个版本新增与修复</div></div>';
-    h += '<div class="card"><div class="act" id="openFeedback">📮 反馈箱 · 提交问题 / 建议 / 举报</div></div>';
     h += '<div class="card"><div class="card-h">开发者联系方式</div>' +
       '<div class="r-sub" style="padding:11px 13px;white-space:normal">' +
       '反馈问题或建议请发邮件给开发者：<br>' +
@@ -1807,7 +1808,6 @@
       setEntries[se].onclick = function () { openSettings(); };
     }
     bind('openAppearance', openThemeModal);
-    bind('openFeedback', openFeedbackBox);
     var clEntry = $('viewChangelog');
     if (clEntry) clEntry.onclick = showChangelog;
     bind('editNick', doChangeNickname);
@@ -2033,6 +2033,11 @@
       '<div class="set-note">默认保存到系统「下载」文件夹。若所选目录因系统版本或权限限制无法写入，' +
       '会自动降级保存到应用私有目录，并在提示中说明实际保存位置。</div></div>';
 
+    var isAdmin = S.user && (S.user.founder || S.user.master);
+    h += '<div class="card"><div class="act" id="openFeedback">' +
+      (isAdmin ? '📮 官方反馈中心 · 处理待审反馈与举报' : '📮 反馈与举报 · 提交问题 / 建议 / 举报') +
+      '</div></div>';
+
     h += '<div class="card"><div class="card-h">关于</div>' +
       '<div id="verBox" class="ver-box"><div class="ver-loading">正在读取线上版本…</div></div>' +
       '<div class="set-note">轻聊 · 聊天与文件传输<br>' +
@@ -2069,6 +2074,7 @@
       toast(goldFxOn() ? '金色特效已开启' : '金色特效已全部关闭');
       renderSettings();
     });
+    bind('openFeedback', openFeedbackBox);
     refreshCacheInfo();
     refreshSaveDirInfo();
     loadVersionInfo();
@@ -3299,6 +3305,7 @@
   /* ---------------- 群管理：成员面板 ---------------- */
 
   $('memberBtn').onclick = openMembers;
+  $('feedbackBtn').onclick = openFeedbackBox;
 
   /* ---------------- 多选模式：底部操作栏 ---------------- */
 
@@ -4718,8 +4725,13 @@
     } catch (e3) { /* 老内核不支持就算了 */ }
   }
 
-  /** 反馈箱：查看我的反馈列表 + 提交新反馈 */
+  /** 反馈箱：普通用户看自己的反馈列表；官方账号看待处理审查与全部反馈 */
   function openFeedbackBox() {
+    var isAdmin = S.user && (S.user.founder || S.user.master);
+    if (isAdmin) {
+      openAdminFeedbackBox();
+      return;
+    }
     var box = document.createElement('div');
     box.style.maxHeight = '56vh';
     box.style.overflow = 'auto';
@@ -4798,6 +4810,146 @@
     });
 
     openModal('反馈箱', box, null, '关闭');
+  }
+
+  /** 官方反馈中心：待处理审查 + 全部反馈 */
+  function openAdminFeedbackBox() {
+    var box = document.createElement('div');
+    box.style.maxHeight = '56vh';
+    box.style.overflow = 'auto';
+    var loading = document.createElement('div');
+    loading.className = 'empty';
+    loading.textContent = '加载中…';
+    box.appendChild(loading);
+
+    // 同时拉 reviews 和 feedback
+    var reviewsData = null, feedbackData = null;
+    function tryRender() {
+      if (!reviewsData || !feedbackData) return;
+      box.innerHTML = '';
+
+      var pending = (reviewsData.list || []).filter(function (r) { return r.status === 'pending'; });
+      var openFb = (feedbackData.feedback || []).filter(function (f) { return f.status === 'open'; });
+
+      // 顶部统计
+      var stat = document.createElement('div');
+      stat.style.cssText = 'display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;';
+      stat.innerHTML = '<span class="badge warn">待处理审查 ' + pending.length + '</span>' +
+        '<span class="badge gray">待回复反馈 ' + openFb.length + '</span>';
+      box.appendChild(stat);
+
+      // 审查列表
+      if (pending.length) {
+        var rh = document.createElement('div');
+        rh.style.cssText = 'font-weight:600;font-size:14px;margin:8px 0 4px;color:var(--accent);';
+        rh.textContent = '待处理审查';
+        box.appendChild(rh);
+        for (var i = 0; i < pending.length; i++) {
+          var r = pending[i];
+          var rc = document.createElement('div');
+          rc.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-2);';
+          var rt = document.createElement('div');
+          rt.style.cssText = 'font-weight:600;font-size:13px;margin-bottom:3px;';
+          rt.textContent = (r.kind === 'image' ? '【图片审核】' : '【举报】') +
+            (r.targetType === 'message' ? '消息' : r.targetType === 'file' ? '文件' : '内容');
+          rc.appendChild(rt);
+          var rd = document.createElement('div');
+          rd.style.cssText = 'font-size:12px;color:var(--fg-2);line-height:1.6;margin-bottom:6px;';
+          rd.textContent = '理由：' + (r.reason || '系统自动标记') +
+            ' | 剩余 ' + Math.ceil((r.remainMs || 0) / 60000) + ' 分钟';
+          rc.appendChild(rd);
+          var rb = document.createElement('div');
+          rb.style.cssText = 'display:flex;gap:8px;';
+          var delBtn = document.createElement('button');
+          delBtn.className = 'btn small danger';
+          delBtn.textContent = '确认违规 · 删除';
+          delBtn.onclick = (function (id) {
+            return function () {
+              api('POST', '/api/reviews/' + id + '/confirm', {}, function (err) {
+                if (err) { toast(err.message || '操作失败'); return; }
+                toast('已确认违规并删除');
+                openAdminFeedbackBox();
+              });
+            };
+          })(r.id);
+          rb.appendChild(delBtn);
+          var keepBtn = document.createElement('button');
+          keepBtn.className = 'btn small ghost';
+          keepBtn.textContent = '确认无害 · 保留';
+          keepBtn.onclick = (function (id) {
+            return function () {
+              api('POST', '/api/reviews/' + id + '/clear', {}, function (err) {
+                if (err) { toast(err.message || '操作失败'); return; }
+                toast('已确认无害');
+                openAdminFeedbackBox();
+              });
+            };
+          })(r.id);
+          rb.appendChild(keepBtn);
+          rc.appendChild(rb);
+          box.appendChild(rc);
+        }
+      }
+
+      // 反馈列表
+      if (openFb.length) {
+        var fh = document.createElement('div');
+        fh.style.cssText = 'font-weight:600;font-size:14px;margin:8px 0 4px;color:var(--accent);';
+        fh.textContent = '待回复反馈';
+        box.appendChild(fh);
+        for (var j = 0; j < openFb.length; j++) {
+          var f = openFb[j];
+          var fc = document.createElement('div');
+          fc.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border-2);';
+          var ft = document.createElement('div');
+          ft.style.cssText = 'font-weight:600;font-size:13px;margin-bottom:3px;';
+          ft.textContent = (f.title || '无标题') + ' · ' + (f.type === 'idea' ? '建议' : f.type === 'complaint' ? '举报' : '问题');
+          fc.appendChild(ft);
+          var fc2 = document.createElement('div');
+          fc2.style.cssText = 'font-size:12px;color:var(--fg-2);line-height:1.6;margin-bottom:6px;';
+          fc2.textContent = f.content || '';
+          fc.appendChild(fc2);
+          var fb = document.createElement('div');
+          fb.style.cssText = 'display:flex;gap:8px;';
+          var replyBtn = document.createElement('button');
+          replyBtn.className = 'btn small primary';
+          replyBtn.textContent = '回复';
+          replyBtn.onclick = (function (fid) {
+            return function () {
+              askInput('回复反馈', '回复内容', '', function (text) {
+                if (!text.trim()) { toast('回复不能为空'); return false; }
+                api('POST', '/api/feedback/' + fid + '/reply', { reply: text.trim() }, function (err) {
+                  if (err) { toast(err.message || '回复失败'); return; }
+                  toast('已回复');
+                  openAdminFeedbackBox();
+                });
+              }, '发送');
+            };
+          })(f.id);
+          fb.appendChild(replyBtn);
+          fc.appendChild(fb);
+          box.appendChild(fc);
+        }
+      }
+
+      if (!pending.length && !openFb.length) {
+        var emp = document.createElement('div');
+        emp.className = 'empty';
+        emp.textContent = '暂无待处理事项。';
+        box.appendChild(emp);
+      }
+    }
+
+    api('GET', '/api/reviews', null, function (err, d) {
+      reviewsData = d || { list: [] };
+      tryRender();
+    });
+    api('GET', '/api/feedback', null, function (err, d) {
+      feedbackData = d || { feedback: [] };
+      tryRender();
+    });
+
+    openModal('官方反馈中心', box, null, '关闭');
   }
 
   /** 反馈箱内：提交新反馈的表单 */
