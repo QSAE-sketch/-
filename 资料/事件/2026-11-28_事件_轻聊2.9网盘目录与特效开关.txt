@@ -1,0 +1,52 @@
+2026-11-28　轻聊 v2.9.0：网盘目录与分享下线、金色流光开关、方角科技感、清理测试号
+================================================================================
+
+一、线上数据清理（重大）
+- 盘点：线上库 149 个账号，真实用户仅 3 个（刘子墨 / L18971035559 / 刘子墨__小号），
+  其余 146 个为云端自动化测试遗留（alice/bob/甲方/权限甲/ra84da21 等）。
+- 根因：`npm run test:cloud` 的清理逻辑写在进程末尾，某次跑测试被超时 SIGTERM 打断，
+  清理代码根本没执行 → 这批账号永久留在线上，公共聊天室「已加入 34 人」由此而来。
+- 处置：用权限密钥开 30 分钟维护窗口 → 走 `/api/admin/users/:id/delete`（复用 purgeAccount 级联）
+  逐个注销 146 个，再自毁维护账号。最终 149 → 3，零失败。
+- 防复发：`tools/run-suite.js` 捕获 SIGINT/SIGTERM，先 cloudCleanup() 再退出；
+  新增常备工具 `tools/audit-users.js`（只读盘点）与 `tools/purge-test-users.js`（默认干跑，--apply 才删）。
+
+二、网盘：目录与分享
+- 目录此前是「虚拟目录」（由文件的 folder 字段拼出来），空目录无法存在，也没有新建入口，
+  所以「移动」只能手打目录名，容易打错建出重复目录。
+- 新增集合 `driveFolders`（k1=ownerId, k2=name），文件归属仍以 files.folder 为准，不冗余成员关系。
+  · POST   /api/drive/folders {name}        新建（同名 409、空名/非法字符 400、最长 80 字）
+  · DELETE /api/drive/folders/:name         删空目录；非空返回 400 并告知剩余文件数
+  · GET    /api/drive/files 的 folders 改为「显式目录 ∪ 文件挂载目录」
+- 前端：目录条常驻「＋ 新建目录」，选中目录时可「删除该目录」；移动改为目录点选列表 + 可新建并移入。
+- 分享完善（后端早已支持，前端没用上）：
+  · 再次点击「分享」且已有未过期分享 → 直接弹出「分享链接」面板（链接/提取码/到期/下载次数 + 复制 + 下线），
+    不再重复创建；
+  · 「我的分享」列表每行加「下线」按钮，DELETE /api/drive/shares/:id 立即失效，不必等有效期结束；
+  · 已过期分享再点分享时，提示「上次已过期」并允许重新创建。
+- 注销账号级联补全：purgeAccount 现在同时清 shares（k1=userId）与 driveFolders，避免残留孤儿记录。
+
+三、设置：消息金色流光开关
+- 现象：永久最高权限账号（刘子墨）发的消息带金色流动光效（goldFlow + 扫光带 + 头像金渐变），
+  长时间看晃眼、影响读正文。
+- 方案：本机偏好 `ll_goldfx`，写到 `<html data-goldfx="off">`，CSS 只停动画不撤配色
+  （金色渐变/金边/金字保留，静止后反而更清晰）。设置页新增「外观 · 特效 → 消息金色流光」。
+- 只影响本机显示，不改任何人发出的消息内容。
+
+四、界面：方角科技感（只动视觉）
+- 圆角 token 全局收紧：xs 6→2、sm 8→3、md 11→4、lg 14→6（浅深两套同步，皮肤仍可覆盖）。
+- 卡片：细描边 + 贴地阴影（0 1px 2px），去掉大范围柔光；顶栏：内嵌底部细线替代投影，标题字距 .6px；
+- 底栏选中态改为顶边 24px 短横条（仪表盘感）；时间/次数/体积统一 tabular-nums 等宽对齐。
+- 截图确认浅色/深色/网盘/设置四页无重叠、无看不清、无异常描边。
+
+五、验证与归档
+- 本地全量 `npm test`：817 项零失败（drive 96→108，新增 12 项目录断言）。
+- 线上验收：版本 2.9.0 / code 35；方角 token 与 data-goldfx 样式已生效；
+  POST /api/drive/folders 返回 401（路由存在）；/s/<id> 分享页仍 200。
+- Git：62b4aed 已推送 QSAE-sketch/-；线上 https://qingliao-chat-33476.app.workbuddy.host/?sharecode=T7ELJZOC5A
+- 测试数据：data-drive 等测试目录已清；线上测试号已清零。
+
+六、待办（下一轮）
+- APK 重做：参考 `C:\Users\Administrator\Documents\Trae-CN\temp_20261121_01\天线OPENWIRE-原生版-3.1.0.apk`。
+  该示例为 `com.openwire.chat` 多页原生应用（MainActivity / SquarePage / UserPage / SettingsPage / AdminPage，
+  纯代码绘制 UI、无 XML 布局），当前轻聊 APK 是单页列表式，差距在架构层，需单独一轮重做。
